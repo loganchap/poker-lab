@@ -6,7 +6,7 @@
 
 Play no-limit hold'em against AI opponents and get coached on every decision.
 
-[![Live Demo](https://img.shields.io/badge/▶%20Play%20Now-Live%20Demo-2ea44f?style=for-the-badge)](https://loganchap.github.io/poker-lab/poker-lab.html)
+[![Live Demo](https://img.shields.io/badge/▶%20Play%20Now-Live%20Demo-2ea44f?style=for-the-badge)](https://loganchap.github.io/poker-lab/poker-lab/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 [![No Dependencies](https://img.shields.io/badge/Dependencies-None-orange?style=for-the-badge)]()
 [![Single File](https://img.shields.io/badge/Size-Single%20File-purple?style=for-the-badge)]()
@@ -38,9 +38,9 @@ No signup. No server. No cost. Open the file and play.
 
 ## How to play
 
-**Online:** [loganchap.github.io/poker-lab/poker-lab.html](https://loganchap.github.io/poker-lab/poker-lab.html)
+**Online:** [loganchap.github.io/poker-lab/poker-lab/](https://loganchap.github.io/poker-lab/poker-lab/)
 
-**Locally:** Download `poker-lab.html` and open it in any browser. That's it.
+**Locally:** Download `poker-lab/` and open it in any browser. That's it.
 
 ---
 
