@@ -4,7 +4,7 @@
 
 **A free, no-install poker trainer that runs in your browser.**
 
-Play 6-max NLHE against AI opponents and get coached on every decision.
+Play no-limit hold'em against AI opponents and get coached on every decision.
 
 [![Live Demo](https://img.shields.io/badge/▶%20Play%20Now-Live%20Demo-2ea44f?style=for-the-badge)](https://loganchap.github.io/poker-lab/poker-lab.html)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
@@ -17,7 +17,7 @@ Play 6-max NLHE against AI opponents and get coached on every decision.
 
 ## What is this?
 
-I built Poker Lab to teach myself poker. It's a 6-max no-limit hold'em trainer that gives you real coaching feedback on every hand — not just win/loss, but *why* a play was good or bad.
+I built Poker Lab to teach myself poker. It's a no-limit hold'em trainer (2–9 players) that gives you real coaching feedback on every hand — not just win/loss, but *why* a play was good or bad.
 
 No signup. No server. No cost. Open the file and play.
 
