@@ -1,0 +1,2871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poker Lab · 6-Max Trainer</title>
+<meta name="description" content="Free in-browser poker trainer. Play against 5 AI types, get hand-by-hand coaching, and track your stats. No account needed.">
+<meta property="og:title" content="Poker Lab · 6-Max Trainer">
+<meta property="og:description" content="Built this to teach myself poker. Play 6-max no-limit hold'em against AI opponents, get coaching on every hand, track your win rate. Free, no account, runs in your browser.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#101214;
+  --panel:#16181c;
+  --panel2:#1b1e23;
+  --line:#26292f;
+  --ink:#e8e6e1;
+  --muted:#8a8f98;
+  --dim:#5b6068;
+  --felt:#3fa876;
+  --felt-dim:#2c7a57;
+  --loss:#d96459;
+  --warn:#d9a05b;
+  --cardface:#f6f5f1;
+  --cardred:#c9504a;
+  --carddark:#1a1c1f;
+  --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --disp:'Saira Condensed','Arial Narrow',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--mono);
+  font-size:13px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:disabled{opacity:.35;cursor:default}
+:focus-visible{outline:2px solid var(--felt);outline-offset:2px}
+select,input{
+  font-family:var(--mono);font-size:12px;color:var(--ink);
+  background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:5px 8px;
+}
+.wrap{max-width:960px;margin:0 auto;padding:0 16px 40px}
+
+/* ---------- header ---------- */
+header{border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:10}
+header .wrap{padding-bottom:0}
+.hrow{display:flex;align-items:center;justify-content:space-between;padding:14px 0 8px}
+.brand{font-family:var(--disp);font-weight:700;font-size:22px;letter-spacing:.14em;text-transform:uppercase}
+.brand .dot{color:var(--felt)}
+nav{display:flex;gap:4px}
+nav button{
+  font-family:var(--disp);font-weight:600;font-size:14px;letter-spacing:.12em;text-transform:uppercase;
+  padding:6px 14px;color:var(--muted);border-radius:4px;
+}
+nav button.on{color:var(--ink);background:var(--panel2)}
+nav button:hover{color:var(--ink)}
+.ticker{
+  display:flex;gap:18px;flex-wrap:wrap;padding:6px 0 12px;
+  font-size:11px;color:var(--muted);letter-spacing:.04em;
+}
+.ticker b{color:var(--ink);font-weight:500;margin-left:5px}
+.ticker .pos{color:var(--felt)}
+.ticker .neg{color:var(--loss)}
+.ticker .warn{color:var(--warn)}
+
+/* ---------- table view ---------- */
+.modebar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 0 14px}
+.seg{display:flex;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.seg button{padding:7px 16px;font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.seg button.on{background:var(--felt-dim);color:var(--ink)}
+.modeinfo{color:var(--muted);font-size:11px}
+.modeinfo b{color:var(--ink);font-weight:500}
+.modebar .spacer{flex:1}
+.ghost{border:1px solid var(--line);border-radius:5px;padding:7px 12px;font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.ghost:hover{color:var(--ink);border-color:var(--dim)}
+.ghost.active{color:var(--felt);border-color:var(--felt-dim)}
+
+.table{
+  border:1px solid var(--line);border-radius:10px;background:
+  radial-gradient(ellipse 90% 70% at 50% 28%, #151a17 0%, var(--panel) 62%);
+  padding:16px 16px 0;
+}
+.seats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:16px}
+.seat{
+  border:1px solid var(--line);border-radius:7px;background:var(--panel2);
+  padding:8px 10px;position:relative;transition:border-color .15s;cursor:pointer;text-align:left;
+  min-width:0;
+}
+.seat:hover{border-color:var(--dim)}
+.seat.acting{border-color:var(--felt)}
+.seat.folded{opacity:.38}
+.seat.out{opacity:.18;cursor:default}
+.seat .nm{display:flex;justify-content:space-between;align-items:baseline;gap:4px;margin-bottom:5px}
+.seat .nm b{font-family:var(--disp);font-weight:600;font-size:14px;letter-spacing:.06em}
+.seat .tag{font-size:9px;color:var(--dim);letter-spacing:.08em;white-space:nowrap}
+.seat .row2{display:flex;justify-content:space-between;align-items:center;gap:4px}
+.seat .stk{font-size:11px;color:var(--muted);white-space:nowrap}
+.seat .bet{font-size:11px;color:var(--warn);min-height:17px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seat .bet.act-fold{color:var(--dim)}
+.seat .bet.act-win{color:var(--felt)}
+.seat .hand-name{font-size:10px;color:var(--felt);margin-top:2px}
+.dbtn{
+  position:absolute;top:-7px;right:-5px;width:16px;height:16px;border-radius:50%;
+  background:var(--ink);color:var(--bg);font-size:9px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;
+}
+
+.card{
+  display:inline-flex;align-items:center;justify-content:center;gap:1px;
+  width:34px;height:46px;border-radius:4px;background:var(--cardface);
+  color:var(--carddark);font-weight:600;font-size:14px;
+  box-shadow:0 1px 2px rgba(0,0,0,.45);
+}
+.card.red{color:var(--cardred)}
+.card.back{
+  background:repeating-linear-gradient(45deg,#23262b 0 3px,#1b1e22 3px 6px);
+  box-shadow:inset 0 0 0 1px var(--line);
+}
+.card.sm{width:23px;height:32px;font-size:10px;border-radius:3px}
+.card.lg{width:46px;height:62px;font-size:19px;border-radius:5px}
+.cards{display:flex;gap:4px}
+
+.center{display:flex;flex-direction:column;align-items:center;gap:10px;padding:4px 0 14px}
+.pot{font-size:12px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.pot b{color:var(--ink);font-weight:500;font-size:14px}
+.board{min-height:62px;display:flex;gap:6px;align-items:center}
+.board .slot{width:46px;height:62px;border-radius:5px;border:1px dashed var(--line)}
+
+.log{
+  border-top:1px solid var(--line);margin:0 -16px;padding:9px 16px 10px;
+  font-size:11px;color:var(--dim);height:88px;overflow-y:auto;
+}
+.log div{padding:1px 0}
+.log .hl{color:var(--muted)}
+
+.me{
+  margin-top:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);
+  padding:13px 14px;
+}
+.merow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.posbtn{
+  font-family:var(--disp);font-weight:600;font-size:15px;letter-spacing:.1em;color:var(--felt);
+  border:1px solid var(--line);border-radius:5px;padding:4px 11px;
+}
+.posbtn:hover{border-color:var(--felt-dim)}
+.mestk{font-size:12px;color:var(--muted)}
+.mestk b{color:var(--ink);font-weight:500}
+.tocall{font-size:12px;color:var(--warn)}
+.eqbadge{font-size:11px;color:var(--felt);border:1px solid var(--felt-dim);border-radius:4px;padding:3px 8px}
+.poshint{font-size:11px;color:var(--dim);margin-top:9px;line-height:1.5}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px;align-items:center}
+.abtn{
+  font-family:var(--disp);font-weight:600;font-size:14px;letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid var(--line);border-radius:6px;padding:10px 18px;background:var(--panel);
+}
+.abtn:hover:not(:disabled){border-color:var(--dim)}
+.abtn.fold{color:var(--loss)}
+.abtn.call{color:var(--ink);border-color:var(--dim)}
+.abtn.primary{background:var(--felt-dim);border-color:var(--felt-dim);color:var(--ink)}
+.sizes{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.sizes .lbl{font-size:10px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin:0 2px}
+.chip{
+  border:1px solid var(--line);border-radius:5px;padding:8px 11px;
+  font-size:12px;color:var(--felt);white-space:nowrap;
+}
+.chip:hover:not(:disabled){border-color:var(--felt)}
+.betin{width:74px;padding:7px 9px;font-size:12px;border:1px solid var(--line);border-radius:5px;background:var(--panel2);color:var(--ink)}
+.betin:focus{border-color:var(--felt);outline:none}
+
+.coach{
+  margin-top:12px;border:1px solid var(--line);border-left:3px solid var(--felt);
+  border-radius:6px;background:var(--panel);padding:13px 15px;
+}
+.coach .eyebrow{font-family:var(--disp);font-weight:600;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--felt);margin-bottom:6px}
+.coach p{color:var(--muted);font-size:12px;margin-bottom:7px;line-height:1.6}
+.coach p b{color:var(--ink);font-weight:500}
+.coach .res{font-size:13px;color:var(--ink);margin-bottom:8px}
+.coach .res.neg{color:var(--loss)}
+.coach .res.pos{color:var(--felt)}
+
+.overlay{
+  position:fixed;inset:0;background:rgba(10,11,13,.86);z-index:50;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.modal{
+  max-width:520px;width:100%;max-height:86vh;overflow-y:auto;
+  border:1px solid var(--line);border-radius:10px;
+  background:var(--panel);padding:24px;
+}
+.modal h2{font-family:var(--disp);font-weight:700;font-size:22px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px}
+.modal h2 small{font-size:12px;color:var(--dim);letter-spacing:.1em;margin-left:8px}
+.modal p{color:var(--muted);font-size:12px;margin-bottom:9px;line-height:1.6}
+.modal p b{color:var(--ink);font-weight:500}
+.modal ul{margin:0 0 10px 16px;color:var(--muted);font-size:12px;line-height:1.6}
+.modal li{margin-bottom:4px}
+.modal .mrow{display:flex;gap:10px;margin-top:14px}
+.posblock{border:1px solid var(--line);border-radius:7px;padding:11px 13px;margin-bottom:8px}
+.posblock.cur{border-color:var(--felt-dim)}
+.posblock h4{font-family:var(--disp);font-weight:600;font-size:14px;letter-spacing:.12em;color:var(--felt);margin-bottom:4px}
+.posblock p{margin-bottom:5px}
+.vline{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:8px}
+.vline b{color:var(--ink);font-weight:500}
+
+/* ---------- stats view ---------- */
+.statshead{display:flex;align-items:center;gap:14px;padding:18px 0 14px;flex-wrap:wrap}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.statcard{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:13px 15px}
+.statcard .lab{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.statcard .val{font-family:var(--disp);font-weight:700;font-size:30px;letter-spacing:.03em;margin:4px 0 2px}
+.statcard .bench{font-size:10px;color:var(--dim)}
+.statcard .desc{font-size:10px;color:var(--dim);margin-top:6px;line-height:1.45}
+.sdot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.sdot.ok{background:var(--felt)}
+.sdot.off{background:var(--warn)}
+.sdot.na{background:var(--line)}
+.leaks{margin-top:22px;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:16px}
+.leaks h3{font-family:var(--disp);font-weight:600;font-size:15px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px}
+.leaks h3 .cnt{color:var(--dim);font-size:11px;letter-spacing:.06em}
+.leak{border-top:1px solid var(--line);padding:10px 0;font-size:12px;color:var(--muted);line-height:1.6}
+.leak b{color:var(--ink);font-weight:500}
+.leak .sev{font-size:9px;letter-spacing:.12em;padding:2px 7px;border-radius:3px;margin-right:8px;text-transform:uppercase}
+.sev.high{background:rgba(217,100,89,.16);color:var(--loss)}
+.sev.med{background:rgba(217,160,91,.16);color:var(--warn)}
+.sev.good{background:rgba(63,168,118,.16);color:var(--felt)}
+.lockmsg{color:var(--dim);font-size:12px;padding:8px 0}
+.lockbar{height:3px;background:var(--line);border-radius:2px;margin-top:10px;overflow:hidden}
+.lockbar i{display:block;height:100%;background:var(--felt);transition:width .3s}
+.settingsrow{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-top:22px;padding-top:16px;border-top:1px solid var(--line);font-size:11px;color:var(--dim)}
+.settingsrow input{width:70px}
+.danger{color:var(--loss);border-color:rgba(217,100,89,.4)}
+
+/* ---------- history view ---------- */
+.filters{display:flex;gap:10px;flex-wrap:wrap;padding:18px 0 14px;align-items:center}
+.hrowi{
+  border:1px solid var(--line);border-radius:7px;background:var(--panel);
+  margin-bottom:8px;overflow:hidden;
+}
+.hsum{display:flex;align-items:center;gap:12px;padding:11px 14px;cursor:pointer;flex-wrap:wrap}
+.hsum:hover{background:var(--panel2)}
+.hsum .when{font-size:10px;color:var(--dim);min-width:86px}
+.hsum .hpos{font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:.08em;min-width:34px}
+.hsum .net{margin-left:auto;font-size:13px;white-space:nowrap}
+.hsum .net.pos{color:var(--felt)}
+.hsum .net.neg{color:var(--loss)}
+.hsum .flagchip{font-size:9px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase}
+.hdetail{border-top:1px solid var(--line);padding:13px 15px;background:var(--panel2)}
+.hdetail .lines{font-size:11px;color:var(--muted);margin-bottom:10px}
+.hdetail .lines div{padding:1px 0}
+.hdetail .notes{border-left:2px solid var(--felt);padding-left:10px;margin:10px 0;font-size:11px;color:var(--muted);line-height:1.6}
+.hdetail .notes div{margin-bottom:6px}
+.empty{color:var(--dim);font-size:12px;padding:30px 0;text-align:center}
+
+/* ---------- hint panel ---------- */
+.hint-panel{
+  margin-top:10px;border:1px solid var(--warn);border-left:3px solid var(--warn);
+  border-radius:6px;background:rgba(217,160,91,.06);padding:12px 14px;
+}
+.hint-panel .eyebrow{font-family:var(--disp);font-weight:600;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.hint-panel .question{font-size:12px;color:var(--ink);line-height:1.65;margin-bottom:10px}
+.hint-panel .hint-actions{display:flex;gap:8px;flex-wrap:wrap}
+.hint-panel .hbtn{font-family:var(--disp);font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);border-radius:5px;padding:7px 13px;background:var(--panel);color:var(--muted)}
+.hint-panel .hbtn:hover{border-color:var(--dim);color:var(--ink)}
+.hint-panel .hbtn.dismiss{color:var(--dim)}
+
+/* ---------- setup screen ---------- */
+.setup-overlay{
+  position:fixed;inset:0;background:rgba(10,11,13,.94);z-index:60;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.setup-box{
+  max-width:560px;width:100%;max-height:92vh;overflow-y:auto;
+  border:1px solid var(--line);border-radius:12px;
+  background:var(--panel);padding:28px 28px 24px;
+}
+.setup-box h2{
+  font-family:var(--disp);font-weight:700;font-size:26px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink);margin-bottom:4px;
+}
+.setup-box .sub{font-size:11px;color:var(--dim);letter-spacing:.06em;margin-bottom:22px}
+.setup-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+.setup-group{display:flex;flex-direction:column;gap:5px}
+.setup-group label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.setup-group select,.setup-group input{width:100%;font-size:12px}
+.setup-group .hint{font-size:10px;color:var(--dim);margin-top:2px;line-height:1.4}
+.setup-full{grid-column:1/-1}
+.setup-section{font-family:var(--disp);font-weight:600;font-size:12px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--felt);margin:16px 0 10px;border-top:1px solid var(--line);padding-top:14px}
+.setup-blinds{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:14px}
+.blind-chip{
+  border:1px solid var(--line);border-radius:5px;padding:8px 11px;
+  font-size:11px;color:var(--muted);cursor:pointer;text-align:center;transition:all .12s;
+}
+.blind-chip:hover{border-color:var(--dim);color:var(--ink)}
+.blind-chip.on{border-color:var(--felt);color:var(--felt);background:rgba(63,168,118,.08)}
+.blind-chip b{display:block;font-family:var(--disp);font-weight:600;font-size:14px;letter-spacing:.06em;color:inherit}
+.setup-ai{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:18px}
+.ai-slot{border:1px solid var(--line);border-radius:6px;padding:9px 11px;font-size:11px}
+.ai-slot label{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:4px}
+.ai-slot select{width:100%;font-size:11px;padding:4px 6px}
+.setup-start{
+  width:100%;font-family:var(--disp);font-weight:700;font-size:16px;letter-spacing:.14em;
+  text-transform:uppercase;background:var(--felt-dim);color:var(--ink);
+  border:none;border-radius:7px;padding:14px;cursor:pointer;transition:opacity .15s;
+}
+.setup-start:hover{opacity:.88}
+
+@media (max-width:680px){
+  .seats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .card{width:30px;height:41px;font-size:12px}
+  .card.lg{width:40px;height:54px;font-size:16px}
+  .board .slot{width:40px;height:54px}
+}
+@media (prefers-reduced-motion: reduce){
+  *{transition:none !important;animation:none !important}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="hrow">
+      <div class="brand">Poker<span class="dot">·</span>Lab</div>
+      <nav>
+        <button id="tab-table" class="on" onclick="showView('table')">Table</button>
+        <button id="tab-stats" onclick="showView('stats')">Stats</button>
+        <button id="tab-history" onclick="showView('history')">History</button>
+      </nav>
+    </div>
+    <div class="ticker" id="ticker"></div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ TABLE ============ -->
+  <section id="view-table">
+    <div class="modebar">
+      <div class="seg">
+        <button id="mode-cash" class="on" onclick="setMode('cash')">Cash</button>
+        <button id="mode-tourney" onclick="setMode('tourney')">Tournament</button>
+      </div>
+      <div class="modeinfo" id="modeinfo"></div>
+      <div class="spacer"></div>
+      <button class="ghost" id="eqToggle" onclick="toggleEquity()">Win %: off</button>
+      <button class="ghost" id="rebuyBtn" style="display:none" onclick="rebuy()">Rebuy</button>
+      <button class="ghost" onclick="openSetup()">New game</button>
+      <button class="ghost" onclick="endSession()">End session</button>
+    </div>
+
+    <div class="table">
+      <div class="seats" id="seats"></div>
+      <div class="center">
+        <div class="pot" id="potline"></div>
+        <div class="board" id="board"></div>
+      </div>
+      <div class="log" id="log"></div>
+    </div>
+
+    <div class="me" id="mepanel">
+      <div class="merow">
+        <button class="posbtn" id="mepos" onclick="positionGuide()">·</button>
+        <span class="cards" id="mecards"></span>
+        <span class="mestk" id="mestk"></span>
+        <span class="tocall" id="metocall"></span>
+        <span class="eqbadge" id="eqbadge" style="display:none"></span>
+      </div>
+      <div class="poshint" id="poshint"></div>
+      <div class="actions" id="actbar"></div>
+    </div>
+
+    <div class="coach" id="coachpanel" style="display:none"></div>
+    <div class="hint-panel" id="hintpanel" style="display:none"></div>
+  </section>
+
+  <!-- ============ STATS ============ -->
+  <section id="view-stats" style="display:none">
+    <div class="statshead">
+      <div class="seg">
+        <button id="scope-life" class="on" onclick="setScope('life')">Lifetime</button>
+        <button id="scope-sess" onclick="setScope('sess')">Session</button>
+      </div>
+      <div class="modeinfo" id="statsub"></div>
+    </div>
+    <div class="statgrid" id="statgrid"></div>
+    <div class="leaks" id="leakpanel"></div>
+    <div class="settingsrow">
+      <span>Stats are measured in big blinds so cash and tournament hands compare cleanly. Table amounts are chips.</span>
+      <span style="flex:1"></span>
+      <button class="ghost" onclick="exportData()" title="Download your stats and hand history as a backup file">Export data</button>
+      <button class="ghost" onclick="importData()" title="Load a previously exported backup file">Import data</button>
+      <button class="ghost danger" onclick="resetAll()">Reset all data</button>
+    </div>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section id="view-history" style="display:none">
+    <div class="filters">
+      <select id="f-pos" onchange="renderHistory()">
+        <option value="">Position: all</option>
+        <option>BTN</option><option>SB</option><option>BB</option>
+        <option>UTG</option><option>HJ</option><option>CO</option>
+      </select>
+      <select id="f-flag" onchange="renderHistory()">
+        <option value="">Filter: all</option>
+        <option value="won">Won</option>
+        <option value="lost">Lost</option>
+        <option value="vpip">Played (VPIP)</option>
+        <option value="pfr">Raised preflop</option>
+        <option value="threeBet">3-bet</option>
+        <option value="foldCbet">Folded to c-bet</option>
+        <option value="wtsd">Went to showdown</option>
+        <option value="noted">Has coach note</option>
+      </select>
+      <select id="f-mode" onchange="renderHistory()">
+        <option value="">Mode: all</option>
+        <option value="cash">Cash</option>
+        <option value="tourney">Tournament</option>
+      </select>
+      <span style="flex:1"></span>
+      <button class="ghost danger" onclick="clearHistory()">Clear history</button>
+    </div>
+    <div id="histlist"></div>
+  </section>
+
+</main>
+
+<div class="overlay" id="overlay" style="display:none">
+  <div class="modal" id="modalbox"></div>
+</div>
+
+<!-- ============ SETUP SCREEN ============ -->
+<div class="setup-overlay" id="setupOverlay">
+  <div class="setup-box">
+    <h2>Poker<span style="color:var(--felt)">·</span>Lab</h2>
+    <div class="sub">Configure your game before you sit down</div>
+
+    <div class="setup-section">Game type</div>
+    <div class="setup-grid">
+      <div class="setup-group">
+        <label>Mode</label>
+        <select id="cfg-mode" onchange="updateSetupUI()">
+          <option value="cash">Cash game</option>
+          <option value="tourney">Tournament (Sit &amp; Go)</option>
+        </select>
+      </div>
+      <div class="setup-group">
+        <label>Players at table</label>
+        <select id="cfg-players">
+          <option value="2">2-handed (heads up)</option>
+          <option value="3">3-handed</option>
+          <option value="4">4-handed</option>
+          <option value="5">5-handed</option>
+          <option value="6" selected>6-max (default)</option>
+          <option value="7">7-handed</option>
+          <option value="8">8-handed</option>
+          <option value="9">9-handed (full ring)</option>
+        </select>
+        <span class="hint">Adds or removes AI opponents</span>
+      </div>
+    </div>
+
+    <div class="setup-section">Blinds &amp; stacks</div>
+    <div class="setup-grid">
+      <div class="setup-group">
+        <label>Starting stack (chips)</label>
+        <input type="number" id="cfg-stack" min="100" max="100000" step="100" value="300">
+      </div>
+      <div class="setup-group">
+        <label>Small blind</label>
+        <input type="number" id="cfg-sb" min="1" max="10000" step="1" value="1">
+      </div>
+      <div class="setup-group">
+        <label>Big blind</label>
+        <input type="number" id="cfg-bb" min="2" max="20000" step="1" value="3">
+      </div>
+
+    </div>
+
+    <div id="cfg-tourney-section">
+      <div class="setup-section">Blind schedule (tournament)</div>
+      <div class="hint" style="margin-bottom:10px;color:var(--dim);font-size:11px">Pick a preset or the blinds will start at your SB/BB and escalate on the schedule below.</div>
+      <div class="setup-blinds">
+        <div class="blind-chip on" id="sched-bar" onclick="pickSched('bar')">
+          <b>Bar game</b>100/200 start
+        </div>
+        <div class="blind-chip" id="sched-casino" onclick="pickSched('casino')">
+          <b>Casino SNG</b>25/50 start
+        </div>
+        <div class="blind-chip" id="sched-turbo" onclick="pickSched('turbo')">
+          <b>Turbo</b>Fast escalation
+        </div>
+        <div class="blind-chip" id="sched-custom" onclick="pickSched('custom')">
+          <b>Custom</b>Use my SB/BB above
+        </div>
+      </div>
+      <div class="setup-grid">
+        <div class="setup-group">
+          <label>Hands per blind level</label>
+          <select id="cfg-handsPerLevel">
+            <option value="6">6 hands (fast)</option>
+            <option value="8" selected>8 hands (standard)</option>
+            <option value="10">10 hands (slow)</option>
+            <option value="15">15 hands (very slow)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-section">Opponents</div>
+    <div class="setup-grid setup-full" style="grid-column:1/-1;margin-bottom:10px">
+      <div class="setup-group setup-full">
+        <label>Opponent style</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+          <div class="blind-chip on" id="opp-custom" onclick="setOppMode('custom')" style="flex:1;min-width:120px"><b>Custom</b>Pick each seat</div>
+          <div class="blind-chip" id="opp-random" onclick="setOppMode('random')" style="flex:1;min-width:120px"><b>Random</b>Shuffled every game</div>
+          <div class="blind-chip" id="opp-mixed" onclick="setOppMode('mixed')" style="flex:1;min-width:120px"><b>Mixed</b>One of each type</div>
+        </div>
+      </div>
+    </div>
+    <div id="cfg-ai-slots" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:12px"></div>
+    <div id="opp-random-note" style="display:none;font-size:11px;color:var(--dim);margin-bottom:14px">Opponent types will be randomly assigned at the start of each game. Good for unpredictable practice.</div>
+
+    <div class="setup-section">AI hint assistant</div>
+    <div class="setup-grid" style="margin-bottom:18px">
+      <div class="setup-group setup-full">
+        <label>Live coaching during hands</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+          <div class="blind-chip" id="hint-off" onclick="setHintMode('off')" style="flex:1"><b>Off</b>Review after hand only</div>
+          <div class="blind-chip on" id="hint-question" onclick="setHintMode('question')" style="flex:1"><b>Ask me</b>Coach asks a question on key decisions</div>
+        </div>
+        <span class="hint" style="margin-top:6px">When enabled, the coach will ask you a question at key moments (big calls, missed bets) so you think through the decision before acting.</span>
+      </div>
+    </div>
+
+    <button class="setup-start" onclick="startFromSetup()">Deal first hand</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================
+   POKER LAB v2 · 6-max NLHE trainer
+   ===================================================== */
+
+const SUITCH = {s:'\u2660', h:'\u2665', d:'\u2666', c:'\u2663'};
+const RANKCH = {2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'T',11:'J',12:'Q',13:'K',14:'A'};
+const CAT_NAMES = ['High card','Pair','Two pair','Trips','Straight','Flush','Full house','Quads','Straight flush'];
+const rand = Math.random;
+const pick = a => a[Math.floor(rand()*a.length)];
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+/* ---------- crypto-random shuffle ---------- */
+function newDeck(){
+  const d = [];
+  for(const s of ['s','h','d','c']) for(let r=2;r<=14;r++) d.push({r,s});
+  const buf = new Uint32Array(d.length);
+  crypto.getRandomValues(buf);
+  for(let i=d.length-1;i>0;i--){
+    const j = buf[i] % (i+1);
+    [d[i],d[j]] = [d[j],d[i]];
+  }
+  return d;
+}
+const cstr = c => RANKCH[c.r]+SUITCH[c.s];
+const cid  = c => RANKCH[c.r]+c.s;
+function prettyIds(str){ // 'Ah Qs' -> 'A♥ Q♠'
+  return (str||'').split(' ').filter(Boolean).map(t=>t[0]+(SUITCH[t.slice(-1)]||'')).join(' ');
+}
+function fmtC(n){ return Math.round(n).toLocaleString('en-US'); }
+
+/* ---------- hand evaluation ---------- */
+function score5(cs){
+  const rs = cs.map(c=>c.r).sort((a,b)=>b-a);
+  const flush = cs.every(c=>c.s===cs[0].s);
+  const cnt = {};
+  rs.forEach(r=>cnt[r]=(cnt[r]||0)+1);
+  const groups = Object.keys(cnt).map(r=>({r:+r,n:cnt[r]})).sort((a,b)=>b.n-a.n||b.r-a.r);
+  const uniq = [...new Set(rs)];
+  let sHigh = 0;
+  if(uniq.length===5){
+    if(uniq[0]-uniq[4]===4) sHigh = uniq[0];
+    else if(uniq[0]===14 && uniq[1]===5 && uniq[4]===2 && uniq[1]-uniq[4]===3) sHigh = 5;
+  }
+  let cat, tb;
+  if(flush && sHigh){ cat=8; tb=[sHigh]; }
+  else if(groups[0].n===4){ cat=7; tb=[groups[0].r, groups[1].r]; }
+  else if(groups[0].n===3 && groups[1].n===2){ cat=6; tb=[groups[0].r, groups[1].r]; }
+  else if(flush){ cat=5; tb=rs; }
+  else if(sHigh){ cat=4; tb=[sHigh]; }
+  else if(groups[0].n===3){ cat=3; tb=[groups[0].r, groups[1].r, groups[2].r]; }
+  else if(groups[0].n===2 && groups[1].n===2){ cat=2; tb=[groups[0].r, groups[1].r, groups[2].r]; }
+  else if(groups[0].n===2){ cat=1; tb=[groups[0].r, groups[1].r, groups[2].r, groups[3].r]; }
+  else { cat=0; tb=rs; }
+  let score = cat;
+  for(let i=0;i<5;i++) score = score*15 + (tb[i]||0);
+  return {score, cat};
+}
+function evalBest(cards){
+  if(cards.length===5) return score5(cards);
+  let best = {score:-1, cat:0};
+  const n = cards.length;
+  const combo = (arr) => {
+    const s = score5(arr.map(i=>cards[i]));
+    if(s.score>best.score) best = s;
+  };
+  if(n===6){
+    for(let skip=0;skip<6;skip++) combo([0,1,2,3,4,5].filter(i=>i!==skip));
+  } else {
+    for(let a=0;a<n;a++) for(let b=a+1;b<n;b++)
+      combo([0,1,2,3,4,5,6].filter(i=>i!==a&&i!==b));
+  }
+  return best;
+}
+
+/* ---------- preflop tiers (Chen) ---------- */
+function chen(c1,c2){
+  const hv = r => r===14?10 : r===13?8 : r===12?7 : r===11?6 : r/2;
+  const hi = Math.max(c1.r,c2.r), lo = Math.min(c1.r,c2.r);
+  let s = hv(hi);
+  if(c1.r===c2.r) return Math.max(s*2,5);
+  if(c1.s===c2.s) s += 2;
+  const gap = hi-lo-1;
+  if(gap===1) s-=1; else if(gap===2) s-=2; else if(gap===3) s-=4; else if(gap>=4) s-=5;
+  if(gap<=1 && hi<12) s+=1;
+  return Math.ceil(s);
+}
+function tierOf(hole){
+  const s = chen(hole[0],hole[1]);
+  if(s>=10) return 1;
+  if(s>=9) return 2;
+  if(s>=8) return 3;
+  if(s>=7) return 4;
+  if(s>=6) return 5;
+  if(s>=5) return 6;
+  if(s>=4) return 7;
+  return 8;
+}
+
+/* ---------- postflop hand bucket + draws ---------- */
+function bucketOf(hole, board){
+  if(!board.length) return null;
+  const all = hole.concat(board);
+  const ev = evalBest(all);
+  const br = board.map(c=>c.r);
+  const bmax = Math.max(...br);
+  const bsorted = [...br].sort((a,b)=>b-a);
+  const b2 = bsorted[1]||0;
+  const h = [hole[0].r, hole[1].r];
+  const pocket = h[0]===h[1];
+  let bucket = 'air';
+
+  if(ev.cat>=4){
+    bucket = 'monster';
+    if(board.length===5){
+      const bev = score5(board);
+      if(bev.score>=ev.score) bucket = 'medium';
+    }
+  } else if(ev.cat===3){
+    if(pocket && br.includes(h[0])) bucket='monster';
+    else if(h.some(r=>br.filter(x=>x===r).length===2)) bucket='monster';
+    else bucket='medium';
+  } else if(ev.cat===2){
+    const pairsWithBoard = [...new Set(h.filter(r=>br.includes(r)))];
+    if(!pocket && pairsWithBoard.length===2) bucket='monster';
+    else if(pocket && h[0]>bmax) bucket='strong';
+    else if(pairsWithBoard[0]===bmax) bucket='strong';
+    else if(pairsWithBoard.length) bucket='medium';
+    else bucket='weak';
+  } else if(ev.cat===1){
+    if(pocket){
+      bucket = h[0]>bmax ? 'strong' : (h[0]>b2 ? 'medium' : 'weak');
+    } else if(br.includes(h[0]) || br.includes(h[1])){
+      const pr = br.includes(h[0]) ? h[0] : h[1];
+      const kick = pr===h[0] ? h[1] : h[0];
+      if(pr===bmax) bucket = kick>=11 ? 'strong' : 'medium';
+      else if(pr>=b2) bucket = 'medium';
+      else bucket = 'weak';
+    } else bucket='air';
+  } else bucket='air';
+
+  let fd=false, oesd=false, gut=false;
+  if(board.length<5){
+    for(const s of ['s','h','d','c']){
+      const tot = all.filter(c=>c.s===s).length;
+      if(tot===4 && hole.some(c=>c.s===s)) fd=true;
+    }
+    const ranks = new Set(all.map(c=>c.r));
+    if(ranks.has(14)) ranks.add(1);
+    let windows = 0;
+    for(let lo=1;lo<=10;lo++){
+      const win = [lo,lo+1,lo+2,lo+3,lo+4];
+      const have = win.filter(r=>ranks.has(r));
+      const holeIn = win.some(r=>h.includes(r) || (r===1&&h.includes(14)));
+      if(have.length===4 && holeIn && ev.cat<4) windows++;
+    }
+    if(windows>=2) oesd=true; else if(windows===1) gut=true;
+  }
+  const over = !pocket && h[0]>bmax && h[1]>bmax;
+  let outs = 0;
+  if(fd) outs+=9;
+  if(oesd) outs+= fd?6:8;
+  else if(gut) outs+= fd?3:4;
+  if(over && bucket==='air') outs+=6;
+  const draws = [];
+  if(fd) draws.push('flush draw');
+  if(oesd) draws.push('open-ended straight draw');
+  else if(gut) draws.push('gutshot');
+  if(over && bucket==='air') draws.push('two overcards');
+  return {bucket, outs, draws, cat:ev.cat};
+}
+const BUCKET_PHRASE = {
+  monster:'a monster', strong:'top pair or better', medium:'a middling pair',
+  weak:'a weak pair', air:'no pair and no made hand'
+};
+
+/* ---------- Monte Carlo equity vs random hands ---------- */
+function heroEquity(hole, board, nOpp){
+  if(nOpp<=0) return 100;
+  const trials = board.length===0?500 : board.length===3?800 : board.length===4?1000 : 1200;
+  const used = new Set(hole.concat(board).map(c=>c.r+'_'+c.s));
+  const base = [];
+  for(const s of ['s','h','d','c']) for(let r=2;r<=14;r++){
+    if(!used.has(r+'_'+s)) base.push({r,s});
+  }
+  const need = 5-board.length;
+  let score = 0;
+  for(let t=0;t<trials;t++){
+    const deck = base.slice();
+    const take = nOpp*2 + need;
+    for(let i=0;i<take;i++){
+      const j = i + Math.floor(rand()*(deck.length-i));
+      [deck[i],deck[j]]=[deck[j],deck[i]];
+    }
+    const fullBoard = board.concat(deck.slice(nOpp*2, nOpp*2+need));
+    const myS = evalBest(hole.concat(fullBoard)).score;
+    let best=-1, ties=1;
+    for(let o=0;o<nOpp;o++){
+      const os = evalBest([deck[o*2],deck[o*2+1]].concat(fullBoard)).score;
+      if(os>best){ best=os; }
+    }
+    if(myS>best) score += 1;
+    else if(myS===best) score += 0.5;
+  }
+  return score/trials*100;
+}
+
+/* ---------- AI archetypes (research-tuned) ---------- */
+const PROF = {
+  station: { label:'STATION',
+    pre:{open:2, limp:7, call:7, tb:1, bluff3:0, callTb:5},
+    post:{
+      bet:{monster:.55,strong:.3,medium:.12,weak:.08,air:.04,draw:.18},
+      raise:{monster:.4,strong:.1,medium:0,weak:0,air:0,draw:.06},
+      call:{
+        cheap:{monster:1,strong:1,medium:.97,weak:.92,air:.45,draw:.97},
+        mid:{monster:1,strong:.97,medium:.9,weak:.78,air:.28,draw:.92},
+        big:{monster:1,strong:.95,medium:.8,weak:.6,air:.12,draw:.72}
+      },
+      cbet:.2, size:[0.4,0.55], allinTighten:.8
+    }},
+  tag: { label:'TAG',
+    pre:{open:4, limp:0, call:4, tb:1, bluff3:.07, callTb:2},
+    post:{
+      bet:{monster:.88,strong:.78,medium:.35,weak:.12,air:.12,draw:.5},
+      raise:{monster:.55,strong:.22,medium:.04,weak:0,air:.03,draw:.14},
+      call:{
+        cheap:{monster:1,strong:.95,medium:.8,weak:.45,air:.1,draw:.9},
+        mid:{monster:1,strong:.9,medium:.5,weak:.18,air:.04,draw:.65},
+        big:{monster:1,strong:.82,medium:.3,weak:.08,air:.02,draw:.4}
+      },
+      cbet:.7, size:[0.55,0.7], allinTighten:.7
+    }},
+  lag: { label:'LAG',
+    pre:{open:6, limp:0, call:6, tb:2, bluff3:.14, callTb:3},
+    post:{
+      bet:{monster:.9,strong:.85,medium:.6,weak:.4,air:.42,draw:.68},
+      raise:{monster:.6,strong:.3,medium:.1,weak:.06,air:.08,draw:.2},
+      call:{
+        cheap:{monster:1,strong:.97,medium:.88,weak:.6,air:.3,draw:.95},
+        mid:{monster:1,strong:.93,medium:.65,weak:.4,air:.15,draw:.8},
+        big:{monster:1,strong:.85,medium:.45,weak:.2,air:.06,draw:.55}
+      },
+      cbet:.8, size:[0.66,0.9], allinTighten:.75
+    }},
+  nit: { label:'NIT',
+    pre:{open:2, limp:0, call:2, tb:1, bluff3:0, callTb:1},
+    post:{
+      bet:{monster:.85,strong:.6,medium:.12,weak:.04,air:.04,draw:.3},
+      raise:{monster:.6,strong:.18,medium:0,weak:0,air:0,draw:.05},
+      call:{
+        cheap:{monster:1,strong:.92,medium:.6,weak:.2,air:.04,draw:.75},
+        mid:{monster:1,strong:.85,medium:.3,weak:.06,air:.01,draw:.45},
+        big:{monster:1,strong:.7,medium:.12,weak:.02,air:0,draw:.25}
+      },
+      cbet:.35, size:[0.5,0.65], allinTighten:.55
+    }},
+  maniac: { label:'MANIAC',
+    pre:{open:7, limp:0, call:7, tb:3, bluff3:.3, callTb:4},
+    post:{
+      bet:{monster:.95,strong:.9,medium:.72,weak:.55,air:.5,draw:.78},
+      raise:{monster:.65,strong:.4,medium:.18,weak:.1,air:.13,draw:.25},
+      call:{
+        cheap:{monster:1,strong:1,medium:.92,weak:.7,air:.45,draw:.95},
+        mid:{monster:1,strong:.96,medium:.78,weak:.5,air:.3,draw:.85},
+        big:{monster:1,strong:.9,medium:.6,weak:.32,air:.15,draw:.65}
+      },
+      cbet:.85, size:[0.8,1.2], allinTighten:.85
+    }}
+};
+const POS_ADJ = {UTG:-2, 'UTG+1':-1, 'UTG+2':-1, LJ:0, HJ:0, CO:1, BTN:2, SB:0, BB:0};
+const AI_ROSTER = [
+  {name:'Sam',   type:'station'},
+  {name:'Tina',  type:'tag'},
+  {name:'Loco',  type:'lag'},
+  {name:'Norm',  type:'nit'},
+  {name:'Max',   type:'maniac'},
+  {name:'Rita',  type:'station'},
+  {name:'Cole',  type:'tag'},
+  {name:'Dex',   type:'lag'},
+];
+const VILLAIN_INFO = {
+  station:{title:'Sam · The Calling Station', sub:'loose-passive',
+    desc:'Plays half his hands or more and hates folding. Calls with any pair, any draw, sometimes just two big cards. Almost never raises without a real hand.',
+    exploit:['Value bet relentlessly on all three streets. Second pair is a value hand against Sam.','Size up: he calls big bets nearly as often as small ones, so charge maximum.','Never bluff him. Stations call. Your bluff has to get through someone who does not fold.','When Sam raises, believe him. Passive players raising means a monster.'],
+    watch:'Most profitable player at the table if you stay disciplined.'},
+  nit:{title:'Norm · The Nit', sub:'tight-passive rock',
+    desc:'Plays only premium hands and folds to pressure everywhere else. A turn or river bet from Norm means a very strong hand.',
+    exploit:['Attack his blinds and limps constantly. He folds too often to fight back.','Steal small pots with c-bets. He gives up without a piece.','When he raises, fold everything but the nuts. Only stack off with sets or better.','3-bet his rare opens only with premiums. His opening range is already monsters.'],
+    watch:'You will not win big pots from Norm. You win by taking fifty small ones.'},
+  tag:{title:'Tina · The TAG', sub:'tight-aggressive',
+    desc:'The solid regular. Tight preflop range, aggressive with it, c-bets often, and capable of folding when beat. The most common winning style.',
+    exploit:['Respect her early-position raises. That range is real.','3-bet her late-position opens. She opens wider there and folds correctly.','Float her c-bets in position and take the pot when she gives up on the turn.','Do not call down light. Her big bets on later streets are weighted to value.'],
+    watch:'The hardest seat to profit from. Mostly stay out of her way without a hand or a plan.'},
+  lag:{title:'Loco · The LAG', sub:'loose-aggressive',
+    desc:'Opens wide, barrels often, and applies pressure on every street. Some of it is real, a lot of it is not.',
+    exploit:['Call down lighter. Your bluff catchers go up in value against constant aggression.','Let him bluff into your strong hands. Trap instead of re-raising and check-call him down.','Tighten your own value range and snap him off with it.','Play pots in position against him. Out of position vs a LAG is misery.'],
+    watch:'Variance is high against Loco. Expect swings and keep making the right calls.'},
+  maniac:{title:'Max · The Maniac', sub:'hyper-aggressive',
+    desc:'Raises and re-raises with almost anything, builds giant pots out of nothing, and never slows down. Wins big early, spews it back later.',
+    exploit:['Tighten way up and wait. One pair or better is usually enough to play for stacks.','Play strong hands fast and big. He does not fold, so charge him everything.','Never try to bluff him off a hand. There is no hand he folds.','Do not get into raising wars with marginal hands. Patience is the whole strategy.'],
+    watch:'He will suck out on you sometimes. That is the price of a massive long-term edge.'}
+};
+
+/* ---------- position guide ---------- */
+const POSINFO = {
+  UTG:{hint:'UTG: first to act, most players behind you. Tightest spot at the table. Raise big pairs, big aces, and strong broadways; fold everything else.',
+    s:'Strength: an early raise carries weight. Players give UTG opens respect, so your raises get through or get action from worse.',
+    w:'Weakness: you act with zero information preflop and usually play the whole hand out of position.',
+    range:'Open roughly the top 10 to 12 percent: 77+, AJ+, ATs, KQs. Raise or fold, never limp.'},
+  'UTG+1':{hint:'UTG+1: second to act, still very early. One fewer player behind than UTG but still tight territory.',
+    s:'Strength: slight positional improvement over UTG. Opens still get respect.',
+    w:'Weakness: still acting early with most of the table behind you.',
+    range:'Open around 12 to 14 percent: 66+, AJs+, AJo+, KQs, KQo. Slightly wider than UTG.'},
+  'UTG+2':{hint:'UTG+2: third to act. Getting closer to middle position. Range opens up slightly.',
+    s:'Strength: a few more players have already folded, reducing the field.',
+    w:'Weakness: still early enough that good players behind you can squeeze.',
+    range:'Open around 14 to 16 percent: 55+, ATs+, AJo+, KQs, KJs. Fold the weak suited connectors.'},
+  LJ:{hint:'LJ (lojack): middle position at a 9-handed table. Four players still behind.',
+    s:'Strength: starting to transition into stealing territory. Opens get some respect.',
+    w:'Weakness: the HJ, CO, and BTN all have position on you postflop.',
+    range:'Open around 16 to 18 percent: 44+, A9s+, ATo+, KQs, KJs, QJs. Fold weak offsuit hands.'},
+  HJ:{hint:'HJ (hijack): three to four players behind. Opens start to widen.',
+    s:'Strength: if the CO and BTN fold you have position on the blinds.',
+    w:'Weakness: CO and BTN with position can still wake up behind you.',
+    range:'Open around 18 to 20 percent: 33+, A8s+, ATo+, KQs, KJs, KJo, QJs. Raise or fold.'},
+  CO:{hint:'CO (cutoff): one off the button, only three left to act. Start attacking here.',
+    s:'Strength: you have position on everyone but the button postflop. Wide opens start printing.',
+    w:'Weakness: the button can 3-bet you with position. Be ready for pushback.',
+    range:'Open around 25 percent: any pair, A8+, any suited ace, KT+, QT+, JTs, T9s, 98s.'},
+  BTN:{hint:'BTN: the best seat in poker. You act last on every postflop street and see everyone\u2019s decision before yours.',
+    s:'Strength: position on the entire table for the whole hand. Most of your lifetime profit comes from this seat.',
+    w:'Weakness: only the blinds remain, so your raises get less respect. Expect more defends.',
+    range:'Open 40 percent or more: any pair, any suited ace, any broadway, K9+, Q9+, J9+, suited connectors. Steal relentlessly.'},
+  SB:{hint:'SB: worst seat postflop. You act first on every street, forever. Raise or fold when it folds to you; completing cheap is a trap.',
+    s:'Strength: when folded to you, only one player can fight back. Half your bet is already in.',
+    w:'Weakness: out of position against the whole table after the flop. Even strong hands play badly here.',
+    range:'When folded to you, raise around 35 percent (pairs, aces, broadways, suited hands) and fold the rest. Avoid limping.'},
+  BB:{hint:'BB: you already paid, so you close the action and get a discount. Defend wide vs small raises, check your option in limped pots.',
+    s:'Strength: last to act preflop with money already in. You can profitably defend many hands a normal call could not.',
+    w:'Weakness: you play every postflop street out of position. Defending wide means playing carefully after the flop.',
+    range:'Defend vs a single raise with pairs, suited hands, connected cards, and any broadway. 3-bet your premiums. Check freely in limped pots.'}
+};
+
+/* ---------- stats ---------- */
+function blankStats(){
+  return {hands:0,vpip:0,pfr:0,limped:0,tbOpp:0,tb:0,f3bOpp:0,f3b:0,
+          cbetFaced:0,foldCbet:0,sawFlop:0,wtsd:0,wonSd:0,
+          pBets:0,pCalls:0,netBB:0,won:0};
+}
+const BENCH = {
+  vpip:[20,28], pfr:[16,24], gap:[3,7], tb:[5,10], f3b:[45,65],
+  af:[1.8,4], foldCbet:[35,60], wtsd:[22,30], wsd:[48,56]
+};
+function derive(s){
+  const pct = (a,b)=> b>0 ? a/b*100 : null;
+  const gap = s.hands>0 ? (s.vpip-s.pfr)/s.hands*100 : null;
+  return {
+    hands:s.hands,
+    vpip:pct(s.vpip,s.hands), pfr:pct(s.pfr,s.hands), gap,
+    tb:pct(s.tb,s.tbOpp), f3b:pct(s.f3b,s.f3bOpp),
+    af: s.pCalls>0 ? (s.pBets/s.pCalls) : (s.pBets>0?99:null),
+    foldCbet:pct(s.foldCbet,s.cbetFaced),
+    wtsd:pct(s.wtsd,s.sawFlop), wsd:pct(s.wonSd,s.wtsd),
+    bb100: s.hands>0 ? s.netBB/s.hands*100 : null
+  };
+}
+
+/* ---------- persistence (localStorage) ---------- */
+const DKEY = 'pokerlab:data';
+let DATA = { v:2, life:blankStats(), settings:{showEquity:false, hintMode:'question'}, hands:[] };
+let saveState = 'ok'; // ok | err
+
+function loadData(){
+  try{
+    const raw = localStorage.getItem(DKEY);
+    if(raw){
+      const d = JSON.parse(raw);
+      if(d && d.life){
+        DATA.life = Object.assign(blankStats(), d.life);
+        DATA.settings = Object.assign(DATA.settings, d.settings||{});
+        DATA.hands = Array.isArray(d.hands) ? d.hands : [];
+      }
+    }
+    saveState = 'ok';
+  }catch(e){
+    saveState = 'err';
+    console.error('load failed', e);
+  }
+}
+
+let saveTimer = null;
+function saveData(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{
+    try{
+      if(DATA.hands.length > 500) DATA.hands = DATA.hands.slice(-500);
+      localStorage.setItem(DKEY, JSON.stringify(DATA));
+      saveState = 'ok';
+    }catch(e){
+      saveState = 'err';
+      console.error('save failed', e);
+    }
+    renderTicker();
+  }, 150);
+}
+
+function exportData(){
+  const blob = new Blob([JSON.stringify(DATA, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'pokerlab-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try{
+        const d = JSON.parse(evt.target.result);
+        if(!d || !d.life) throw new Error('Invalid file');
+        DATA.life = Object.assign(blankStats(), d.life);
+        DATA.settings = Object.assign(DATA.settings, d.settings||{});
+        DATA.hands = Array.isArray(d.hands) ? d.hands : [];
+        saveData();
+        renderAll();
+        renderStatsView();
+        renderHistory();
+        showModal('Import successful', `<p>Loaded <b>${DATA.life.hands}</b> lifetime hands and <b>${DATA.hands.length}</b> hand records.</p>`,
+          [{label:'Close', cb:closeModal}]);
+      }catch(err){
+        showModal('Import failed', `<p>Could not read that file. Make sure it is a Poker Lab backup.</p>`,
+          [{label:'Close', cb:closeModal}]);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+/* ---------- game state ---------- */
+let S = null;
+let SESSION = blankStats();
+let userResolve = null;
+let dealing = false;
+let recentNoteKeys = [];
+
+function freshState(mode, cfg){
+  cfg = cfg || {};
+  const tourney = mode==='tourney';
+  const numPlayers = Math.min(9, Math.max(2, cfg.numPlayers||6));
+  const startStack = cfg.startStack || (tourney ? 1500 : 300);
+  const sbVal = cfg.sb || (tourney ? 10 : 1);
+  const bbVal = cfg.bb || (tourney ? 20 : 3);
+  const schedule = cfg.schedule || [[10,20],[15,30],[20,40],[30,60],[50,100],[75,150],[100,200],[150,300],[200,400],[300,600],[400,800],[500,1000]];
+  const handsPerLevel = cfg.handsPerLevel || 8;
+  const aiRoster = cfg.aiRoster || AI_ROSTER.slice(0, numPlayers-1);
+
+  const players = [];
+  players.push({id:0, name:'YOU', type:'user', user:true, stack:startStack,
+                hole:[], folded:false, allIn:false, out:false, streetPut:0, handPut:0, acted:false, revealed:false, lastAct:''});
+  for(let i=0; i<numPlayers-1; i++){
+    const a = aiRoster[i] || AI_ROSTER[i % AI_ROSTER.length];
+    players.push({id:i+1, name:a.name, type:a.type, user:false, stack:startStack,
+                  hole:[], folded:false, allIn:false, out:false, streetPut:0, handPut:0, acted:false, revealed:false, lastAct:''});
+  }
+  return {
+    mode, players, numPlayers, startStack,
+    cfg0: {numPlayers, startStack, sb:sbVal, bb:bbVal, schedule, handsPerLevel, aiRoster},
+    btn: Math.floor(rand()*numPlayers),
+    sb: sbVal, bb: bbVal,
+    level:0, handsAtLevel:0,
+    schedule, handsPerLevel,
+    deck:[], board:[], street:'pre',
+    currentBet:0, lastRaiseSize:0, preRaises:0, preAggressor:null, lastAgg:null,
+    cbetLive:false,
+    handActive:false, finished:false, acting:null,
+    logLines:[], lastWin:[]
+  };
+}
+
+function posLabels(n){
+  if(n===2) return ['BTN','BB'];
+  if(n===3) return ['BTN','SB','BB'];
+  if(n===4) return ['BTN','SB','BB','UTG'];
+  if(n===5) return ['BTN','SB','BB','UTG','CO'];
+  if(n===6) return ['BTN','SB','BB','UTG','HJ','CO'];
+  if(n===7) return ['BTN','SB','BB','UTG','UTG+1','HJ','CO'];
+  if(n===8) return ['BTN','SB','BB','UTG','UTG+1','UTG+2','HJ','CO'];
+  return ['BTN','SB','BB','UTG','UTG+1','UTG+2','LJ','HJ','CO'];
+}
+function liveSeats(){ return S.players.filter(p=>!p.out); }
+function seatOrderFromBtn(){
+  const ordered = [];
+  const n = S.players.length;
+  for(let k=0;k<n;k++){
+    const p = S.players[(S.btn+k)%n];
+    if(!p.out) ordered.push(p);
+  }
+  return ordered;
+}
+function positionOf(p){
+  const ord = seatOrderFromBtn();
+  const labels = posLabels(ord.length);
+  return labels[ord.indexOf(p)] || '·';
+}
+function nextLive(fromId, pred){
+  const n = S.players.length;
+  for(let k=1;k<=n;k++){
+    const p = S.players[(fromId+k)%n];
+    if(!p.out && pred(p)) return p;
+  }
+  return null;
+}
+function potTotal(){ return S.players.reduce((a,p)=>a+p.handPut,0); }
+function unfolded(){ return S.players.filter(p=>!p.out && !p.folded); }
+
+/* ---------- hand record ---------- */
+let H = null;
+function newHandRecord(){
+  const me = S.players[0];
+  const ord = seatOrderFromBtn();
+  const hu = ord.length===2;
+  const sbP = hu ? ord[0] : ord[1];
+  const bbP = hu ? ord[1] : ord[2];
+  H = {
+    id: Date.now()+'-'+Math.floor(rand()*1e4),
+    t: Date.now(), mode:S.mode, bb:S.bb,
+    pos: positionOf(me),
+    stackBefore: me.stack,
+    blinds:[{n:sbP.name,t:sbP.type},{n:bbP.name,t:bbP.type}],
+    hole:'', board:'', net:0, netC:0,
+    flags:{vpip:false,pfr:false,limped:false,threeBet:false,tbOpp:false,f3b:false,f3bOpp:false,
+           cbetFaced:false,foldCbet:false,sawFlop:false,wtsd:false,wonSd:false,won:false},
+    pBets:0,pCalls:0,
+    acts:[], log:[], notes:[], result:''
+  };
+}
+function log(line, hl){
+  S.logLines.push({line, hl:!!hl});
+  if(H && S.handActive) H.log.push(line);
+  renderLog();
+}
+
+/* ---------- hand flow ---------- */
+async function startHand(){
+  if(dealing || S.finished) return;
+  const me = S.players[0];
+  if(S.mode==='cash' && me.stack<=0){ renderAll(); return; }
+  dealing = true;
+  hideCoach();
+
+  if(S.mode==='cash'){
+    S.players.forEach(p=>{ if(!p.user && p.stack < S.startStack*0.3) p.stack = S.startStack; });
+  }
+  if(S.mode==='tourney'){
+    if(S.handsAtLevel>=S.handsPerLevel && S.level < S.schedule.length-1){
+      S.level++; S.handsAtLevel=0;
+      [S.sb,S.bb] = S.schedule[S.level];
+    }
+  }
+
+  const nxt = nextLive(S.btn, p=>true);
+  if(nxt) S.btn = nxt.id;
+
+  S.players.forEach(p=>{
+    p.hole=[]; p.folded=p.out; p.allIn=false; p.streetPut=0; p.handPut=0; p.acted=false; p.revealed=false;
+    p.lastAct=''; p.sdName=''; p.sdScore=0;
+  });
+  S.deck = newDeck();
+  S.board = [];
+  S.street='pre';
+  S.currentBet=0; S.lastRaiseSize=S.bb; S.preRaises=0; S.preAggressor=null; S.lastAgg=null;
+  S.cbetLive=false;
+  S.logLines=[]; S.lastWin=[];
+  S.handActive = true;
+
+  newHandRecord();
+
+  const ord = seatOrderFromBtn();
+  const hu = ord.length===2;
+  const sbP = hu ? ord[0] : ord[1];
+  const bbP = hu ? ord[1] : ord[2];
+  post(sbP, Math.min(S.sb, sbP.stack));
+  post(bbP, Math.min(S.bb, bbP.stack));
+  S.currentBet = S.bb;
+  if(S.mode==='tourney') log(`Level ${S.level+1}: blinds ${S.sb}/${S.bb}`);
+  log(`New hand · ${ord.length} players · ${sbP.name} posts SB ${fmtC(S.sb)}, ${bbP.name} posts BB ${fmtC(S.bb)}`);
+
+  for(const p of ord){ p.hole = [S.deck.pop(), S.deck.pop()]; }
+  H.hole = S.players[0].out ? '' : S.players[0].hole.map(cid).join(' ');
+  renderAll();
+
+  const ok = await runBetting(bbP.id);
+  if(!ok){ await finishByFolds(); dealing=false; return; }
+
+  for(const st of ['flop','turn','river']){
+    if(unfolded().length<2) break;
+    dealStreet(st);
+    if(actorsLeft()<2){ await runout(); break; }
+    const cont = await runBetting(S.btn);
+    if(!cont){ await finishByFolds(); dealing=false; return; }
+  }
+  if(unfolded().length>=2){
+    await ensureFullBoard();
+    await showdown();
+  }
+  dealing=false;
+}
+
+function post(p, amt){
+  amt = Math.min(amt, p.stack);
+  p.stack -= amt; p.streetPut += amt; p.handPut += amt;
+  if(p.stack===0) p.allIn = true;
+}
+function actorsLeft(){ return unfolded().filter(p=>!p.allIn).length; }
+
+function dealStreet(st){
+  S.street = st;
+  S.players.forEach(p=>{ p.streetPut=0; p.acted=false; if(!p.folded&&!p.out&&!p.allIn) p.lastAct=''; });
+  S.currentBet=0; S.lastRaiseSize=S.bb; S.lastAgg=null;
+  if(st==='flop'){ S.board.push(S.deck.pop(),S.deck.pop(),S.deck.pop()); }
+  else S.board.push(S.deck.pop());
+  H.board = S.board.map(cid).join(' ');
+  if(st==='flop' && !S.players[0].folded && !S.players[0].out){ H.flags.sawFlop = true; }
+  const streetLabel = st==='flop' ? 'FLOP' : st==='turn' ? 'TURN' : 'RIVER';
+  log(`${streetLabel}: ${S.board.map(cstr).join(' ')}`, true);
+  renderAll();
+}
+
+async function runBetting(startAfterId){
+  let pointer = startAfterId;
+  let guard = 0;
+  while(guard++ < 300){
+    if(unfolded().length<2) return false;
+    const actors = unfolded().filter(p=>!p.allIn);
+    if(actors.length===0) return true;
+    if(actors.every(p=>p.acted && p.streetPut===S.currentBet)) return true;
+    if(actors.length===1 && actors[0].streetPut>=S.currentBet && actors[0].acted) return true;
+    const p = nextLive(pointer, x=>!x.folded && !x.allIn);
+    if(!p) return true;
+    pointer = p.id;
+    if(p.acted && p.streetPut===S.currentBet) continue;
+    await takeTurn(p);
+    renderAll();
+  }
+  return true;
+}
+
+async function takeTurn(p){
+  S.acting = p.id;
+  renderAll();
+  const toCall = S.currentBet - p.streetPut;
+  let decision;
+  if(p.user){
+    decision = await userTurn(p, toCall);
+  } else {
+    const userOut = S.players[0].folded || S.players[0].out;
+    await sleep(userOut ? 120 : (380 + rand()*420));
+    decision = S.street==='pre' ? aiPre(p, toCall) : aiPost(p, toCall);
+  }
+  S.acting = null;
+  applyAction(p, decision, toCall);
+}
+
+function legalMinRaiseTo(){ return S.currentBet + S.lastRaiseSize; }
+
+function applyAction(p, d, toCall){
+  const pot = potTotal();
+  const snap = {raises:S.preRaises, agg:S.preAggressor, cbetLive:S.cbetLive, lastAgg:S.lastAgg};
+  // poker rule: you can never fold when checking is free
+  if(d.act==='fold' && toCall<=0) d = {act:'check'};
+
+  if(d.act==='fold'){
+    p.folded = true; p.acted = true; p.lastAct='fold';
+    log(`${p.name} folds`);
+    if(p.user) recordUserAct(p,'fold',toCall,pot,0,0,snap);
+    return;
+  }
+  if(d.act==='check'){
+    p.acted = true; p.lastAct='check';
+    log(`${p.name} checks`);
+    if(p.user) recordUserAct(p,'check',0,pot,0,0,snap);
+    return;
+  }
+  if(d.act==='call'){
+    const amt = Math.min(toCall, p.stack);
+    post(p, amt);
+    p.acted = true; p.lastAct='call '+fmtC(amt);
+    log(`${p.name} calls ${fmtC(amt)}${p.allIn?' (all-in)':''}`);
+    if(p.user) recordUserAct(p,'call',toCall,pot,amt,0,snap);
+    return;
+  }
+  // bet / raise to total street amount d.to
+  let to = Math.max(d.to, S.currentBet>0 ? legalMinRaiseTo() : S.bb);
+  to = Math.min(to, p.streetPut + p.stack);
+  const isAllIn = (to === p.streetPut + p.stack);
+  if(!isAllIn && to <= S.currentBet){
+    return applyAction(p, {act: toCall>0?'call':'check'}, toCall);
+  }
+  if(isAllIn && to <= S.currentBet){
+    // short all-in that doesn't even reach the current bet: treat as all-in call
+    return applyAction(p, {act:'call'}, toCall);
+  }
+  const add = to - p.streetPut;
+  const wasBet = S.currentBet===0;
+  if(to > S.currentBet){
+    const inc = to - S.currentBet;
+    const fullRaise = inc >= S.lastRaiseSize;
+    if(fullRaise){
+      S.lastRaiseSize = inc;
+      // a full raise reopens the action
+      S.players.forEach(o=>{ if(o!==p) o.acted=false; });
+    }
+    // a short all-in raise does NOT reopen action: others may call the difference
+    S.currentBet = to;
+    S.lastAgg = p.id;
+    if(S.street==='pre'){
+      S.preRaises++;
+      S.preAggressor = p.id;
+    } else if(S.street==='flop'){
+      if(wasBet && p.id===S.preAggressor) S.cbetLive = true;
+      else if(!wasBet) S.cbetLive = false;
+    }
+  }
+  post(p, add);
+  p.acted = true;
+  p.lastAct = (wasBet&&S.street!=='pre'?'bet ':'raise to ')+fmtC(to);
+  log(`${p.name} ${wasBet&&S.street!=='pre'?'bets':'raises to'} ${fmtC(to)}${p.allIn?' (all-in)':''}`);
+  if(p.user) recordUserAct(p, wasBet&&S.street!=='pre'?'bet':'raise', toCall, pot, add, to, snap);
+}
+
+/* ---------- user stat instrumentation ---------- */
+function villainOf(id){
+  const v = S.players.find(x=>x.id===id);
+  return v && !v.user ? {n:v.name, t:v.type} : null;
+}
+function recordUserAct(p, act, toCall, potBefore, amt, to, snap){
+  const st = S.street;
+  const ctx = {street:st, act, toCall, pot:potBefore, amt, to:to||0, pos:H.pos};
+  const vs = toCall>0 ? villainOf(snap.lastAgg) : null;
+  if(vs){ ctx.vs = vs.n; ctx.vsType = vs.t; }
+  ctx.opp = unfolded().filter(x=>!x.user && !x.folded).map(x=>x.name+':'+x.type);
+  if(st==='pre'){
+    ctx.tier = tierOf(p.hole);
+    ctx.unopened = snap.raises===0;
+    const wasPfr = H.flags.pfr;
+    const voluntary = (act==='call'||act==='raise'||act==='bet');
+    if(voluntary) H.flags.vpip = true;
+    if(act==='raise') H.flags.pfr = true;
+    if(act==='call' && snap.raises===0 && S.currentBet===S.bb && H.pos!=='BB'){
+      H.flags.limped = true;
+    }
+    if(snap.raises===1 && !H.flags.threeBet){
+      H.flags.tbOpp = true;
+      if(act==='raise') H.flags.threeBet = true;
+    }
+    if(wasPfr && snap.raises>=2 && toCall>0 && !H.f3bSeen){
+      if(snap.agg!==p.id){
+        H.f3bSeen = true;
+        H.flags.f3bOpp = true;
+        if(act==='fold') H.flags.f3b = true;
+      }
+    }
+  } else {
+    const b = bucketOf(p.hole, S.board);
+    ctx.bucket = b.bucket; ctx.outs = b.outs; ctx.draws = b.draws;
+    if(act==='bet'||act==='raise') H.pBets++;
+    if(act==='call') H.pCalls++;
+    if(st==='flop' && snap.cbetLive && toCall>0 && p.id!==snap.agg && !H.cbetSeen){
+      H.cbetSeen = true;
+      H.flags.cbetFaced = true;
+      if(act==='fold') H.flags.foldCbet = true;
+    }
+  }
+  H.acts.push(ctx);
+}
+
+/* ---------- user turn UI ---------- */
+function userTurn(p, toCall){
+  return new Promise(res=>{
+    userResolve = res;
+    renderActions(p, toCall);
+    if(DATA.settings.showEquity) updateEquity(p);
+    if((DATA.settings.hintMode||'question') === 'question') maybeShowHint(p, toCall);
+  });
+}
+function uact(d){
+  if(!userResolve) return;
+  const r = userResolve; userResolve = null;
+  document.getElementById('actbar').innerHTML='';
+  hideHint();
+  r(d);
+}
+function customBet(minTo, maxTo){
+  const el = document.getElementById('betin');
+  if(!el) return;
+  let v = parseInt(el.value);
+  if(isNaN(v) || v<=0) return;
+  v = Math.max(minTo, Math.min(v, maxTo));
+  uact({act:'raise', to:v});
+}
+function hideHint(){
+  const el = document.getElementById('hintpanel');
+  if(el) el.style.display='none';
+}
+function maybeShowHint(p, toCall){
+  const el = document.getElementById('hintpanel');
+  if(!el) return;
+  const pot = potTotal();
+  const b = S.board.length ? bucketOf(p.hole, S.board) : null;
+  const pos = H ? H.pos : positionOf(p);
+  const hole = H ? prettyIds(H.hole) : '';
+  const boardP = S.board.length ? S.board.map(cstr).join(' ') : '';
+  const opp = S.players.find(x=>x.id===S.lastAgg && !x.user);
+  const oppName = opp ? opp.name : null;
+  const oppType = opp ? opp.type : null;
+  const stackBB = Math.round(p.stack / S.bb);
+  let q = null;
+
+  if(toCall > 0 && b && (b.bucket==='air'||b.bucket==='weak') && toCall > pot*0.35){
+    const need = Math.round(toCall/(pot+toCall)*100);
+    const oppDesc = oppType==='station'?`${oppName} rarely bluffs`
+      : oppType==='nit'?`${oppName} only bets strong hands`
+      : oppType==='lag'?`${oppName} fires with a wide range`
+      : oppType==='maniac'?`${oppName} bets almost anything`
+      : oppName ? `${oppName} bet into you` : '';
+    const drawNote = b.draws&&b.draws.length ? `You have a ${b.draws[0]} — about ${Math.round((b.outs||0)*2)}% to improve next card.` : '';
+    q=pick([
+      `About to call ${fmtC(toCall)} into ${fmtC(pot)} on the ${S.street} with ${BUCKET_PHRASE[b.bucket]} (${boardP}). You need roughly ${need}% equity. ${oppDesc?oppDesc+'.':''} Can you name two worse hands they might have that you beat?`,
+      `Before you call: the break-even price here is ${need}% equity and you have ${BUCKET_PHRASE[b.bucket]} on ${boardP}. ${oppDesc?oppDesc+'.':''} Is this a real bluff-catch or are you just hoping to be right?`,
+      `${fmtC(toCall)} to call into ${fmtC(pot)}, needing ${need}% equity. You have ${BUCKET_PHRASE[b.bucket]}. ${drawNote||'What is your plan if the next card does not help?'}`,
+      `Calling ${fmtC(toCall)} needs ${need}% equity to break even. With ${BUCKET_PHRASE[b.bucket]} on ${boardP}, what hands worse than yours would ${oppName||'your opponent'} bet here? If you cannot name two, this is a fold.`,
+      `Pot odds say you need ${need}% equity. ${BUCKET_PHRASE[b.bucket]} on ${boardP} rarely has that. ${oppDesc?oppDesc+'. ':''}What specific hand do you beat when you call?`,
+      `Before calling: ${fmtC(toCall)} into ${fmtC(pot)} on the ${S.street} with ${BUCKET_PHRASE[b.bucket]} on ${boardP}. ${oppDesc?oppDesc+'.':''} Are you calling because the math works, or because you hate folding?`,
+      `Break-even equity: ${need}%. ${BUCKET_PHRASE[b.bucket]} on ${boardP}. ${drawNote} What does ${oppName||'your opponent'} have and how much of their range do you beat?`,
+      `You need ${need}% equity. Name one hand ${oppName||'your opponent'} could be bluffing with here. If you cannot find one, the math says fold.`,
+      `${oppDesc?oppDesc+'. ':''}You still need ${need}% equity with ${BUCKET_PHRASE[b.bucket]} on ${boardP}. Are you ahead of their range or just not ready to fold?`,
+      `${fmtC(toCall)} call needs ${need}% equity. ${BUCKET_PHRASE[b.bucket]} on ${boardP}. ${drawNote} Good calls name what they beat. Bad calls just hope.`,
+    ]);
+  }
+  else if(toCall<=0 && S.street==='flop' && H && H.flags.pfr && b && (b.bucket==='strong'||b.bucket==='monster')){
+    const bet = fmtC(Math.round(pot*0.6));
+    q=pick([
+      `You raised preflop and have ${BUCKET_PHRASE[b.bucket]} on ${boardP}. Before checking: what happens if you bet ${bet}? Who at this table calls with worse hands?`,
+      `${BUCKET_PHRASE[b.bucket]} on ${boardP} as the preflop raiser. Checking gives everyone a free card. Who is most likely to bet if you check? Is that what you want?`,
+      `Strong hand on ${boardP}. Bet now to build the pot, or check to trap an aggressive player? Think about who is still in and how they play.`,
+      `Flopped ${BUCKET_PHRASE[b.bucket]} on ${boardP} after raising preflop. Betting builds the pot and charges draws. What does checking accomplish that a bet of ${bet} does not?`,
+      `You showed strength preflop and connected on ${boardP}. Betting maintains your initiative and extracts value now. Which opponents here call a bet with a worse hand?`,
+      `${BUCKET_PHRASE[b.bucket]} and first to act on ${boardP}. Checking gives free cards. Betting around ${bet} charges every draw and keeps you in control. Who here pays off a bet with worse?`,
+      `Preflop raiser with ${BUCKET_PHRASE[b.bucket]} on ${boardP}. The question is not whether to bet but how much. What size gets called by hands you dominate?`,
+      `You have the goods on ${boardP}. Slow-playing costs money against players who will call a bet anyway. Is anyone here the type who pays off value bets with weaker hands?`,
+      `${BUCKET_PHRASE[b.bucket]} on ${boardP} as the aggressor. Checking signals weakness and lets opponents pick up equity for free. A bet of ${bet} keeps you in the driver seat.`,
+    ]);
+  }
+  else if(toCall >= p.stack*0.65 && b){
+    q=pick([
+      `Facing an all-in call with ${BUCKET_PHRASE[b.bucket]} on ${boardP}. ${oppName?`What does ${oppName}'s shoving range look like?`:'What hands would your opponent shove here?'} Are you ahead of most of those or behind?`,
+      `Stack commitment decision. ${BUCKET_PHRASE[b.bucket]} on ${boardP}. ${oppName&&oppType?`${oppName} is ${oppType==='maniac'?'a maniac who shoves wide':oppType==='nit'?'a nit whose shoves are almost always strong':oppType==='lag'?'a LAG who shoves draws and value':'playing solid poker'}.`:''} Enough equity to go all-in?`,
+      `This call puts most of your stack in. With ${BUCKET_PHRASE[b.bucket]} on ${boardP}, ask: is your opponent shoving for value or as a bluff? Your read should drive this decision.`,
+      `All-in decision: ${BUCKET_PHRASE[b.bucket]} on ${boardP}. What percentage of ${oppName||'their'} shoving range do you beat? Under 40% and there may be a better spot ahead.`,
+      `Calling off your stack with ${BUCKET_PHRASE[b.bucket]}. Think through the hands ${oppName||'your opponent'} moves all-in with here. Are you winning or losing against most of those?`,
+      `Stack decision on ${boardP}. ${oppType==='nit'?`${oppName} is a nit — when nits shove, believe them.`:oppType==='maniac'?`${oppName} shoves wide, so your equity vs their range is better than it looks.`:oppType==='lag'?`${oppName} shoves draws and value both. Is ${BUCKET_PHRASE[b.bucket]} ahead of that combined range?`:`What does ${oppName||'your opponent'} have when they commit their stack here?`}`,
+      `Before calling off: two questions. What does ${oppName||'your opponent'} shove here, and how much of that range do you beat? If it is less than half, look for a fold.`,
+      `${BUCKET_PHRASE[b.bucket]} facing a shove on ${boardP}. Think about their entire line from preflop to now. Does it point to a strong value hand or a bluff?`,
+    ]);
+  }
+  else if(S.mode==='tourney' && S.street==='pre' && stackBB<=15 && toCall<=0){
+    q=pick([
+      `You have ${stackBB} big blinds with ${hole} from ${pos}. Short stack means shove or fold. Is this hand strong enough to go all-in and be happy getting called? If yes, shove. If no, fold.`,
+      `${stackBB} BB with ${hole} from ${pos}. Limping or calling small wastes fold equity. Either your hand is worth shoving everything, or it is a fold.`,
+      `At ${stackBB} BB you are in push-or-fold territory. ${hole} from ${pos}: would you be comfortable getting called by the blinds here?`,
+      `${stackBB} big blinds. Limping now and being pot-committed later is worse than just shoving. With ${hole} from ${pos}: shove or fold?`,
+      `Short-stack alert: ${stackBB} BB with ${hole} from ${pos}. Every hand you pass up costs you relative to the blinds. Is this in your shove range or below it?`,
+      `${pos}, ${stackBB} BB, ${hole}. Open-raising small and folding to a 3-bet costs chips you cannot spare. Either commit everything or fold it cleanly.`,
+      `Push-or-fold with ${hole} from ${pos} at ${stackBB} big blinds. Think about who is in the blinds and whether your hand is ahead of their calling range.`,
+      `${stackBB} BB is shove-or-fold depth. Raising small just to fold costs chips both ways. ${hole} from ${pos}: do you want your whole stack in the middle or not?`,
+      `With ${stackBB} big blinds every chip matters. ${hole} from ${pos}: is this strong enough to go all-in right now? If you are unsure, it is probably a fold.`,
+    ]);
+  }
+  else if(toCall<=0 && S.street==='flop' && H && H.flags.pfr && b && b.bucket==='air' && !H.cbetHintShown){
+    H.cbetHintShown=true;
+    const third = fmtC(Math.round(pot*0.4));
+    const half = fmtC(Math.round(pot/2));
+    q=pick([
+      `You raised preflop and missed the flop (${boardP}). A c-bet of ${third} to ${half} continues the story you told preflop. Do you want to bet and represent strength, or check and see the turn free?`,
+      `Preflop raiser on ${boardP} with nothing. A c-bet says you still have a hand. Opponents who missed have to fold. The bet only needs to work about 40% of the time to be profitable. Fire or check?`,
+      `You took the lead preflop, now face a flop with air. Betting represents your range. Checking admits weakness. Who at this table is likely to fold to a bet right now?`,
+      `Missed the flop on ${boardP} after raising preflop. Your raise said you have something. A continuation bet of ${third} keeps that story alive. Checking tells everyone you whiffed.`,
+      `C-bet spot: raised preflop, hit nothing on ${boardP}. A bet of ${third} to ${half} only needs to succeed 33 to 40 percent of the time to be profitable. How often does everyone fold here?`,
+      `You showed strength before the flop. Now you missed on ${boardP}. Betting works because your opponents have to worry about top pair, sets, and overpairs in your range. Apply that pressure?`,
+      `Air on ${boardP} but you raised preflop. A small bet of ${third} takes this pot when everyone else also missed. A check gives away your hand and hands out free cards.`,
+      `Classic c-bet spot: preflop raise, then nothing on ${boardP}. Continue your story with ${third} to ${half} or admit weakness. Who is most likely to give up without a piece of this board?`,
+      `Preflop aggressor with air on ${boardP}. The continuation bet does not need to work every time. Even at 40 percent success it turns a profit. Bet or check — what is your read on the players still in?`,
+    ]);
+  }
+  else if(S.street==='pre' && toCall > S.bb*3 && p.hole.length && tierOf(p.hole)>=5){
+    q=pick([
+      `Facing a raise of ${fmtC(toCall)} with ${hole} from ${pos}. Does this hand play well against the raiser's range? What is your plan if you miss the flop out of position?`,
+      `${hole} facing a ${fmtC(toCall)} raise. Is this hand worth shoving all-in over the raise? Or is it a fold? Calling and then folding flops is a slow chip drain.`,
+      `You have ${hole} facing a raise. Two questions: are you okay going all-in if they re-raise? And what flop do you need, and how often do you hit it?`,
+      `${fmtC(toCall)} to call with ${hole} from ${pos}. You pay to see a flop, miss most of the time, then face another bet you have to fold to. Is that cycle worth entering here?`,
+      `${hole} vs a raise of ${fmtC(toCall)}. What is your plan on a flop like K-7-2? If the answer is check-fold, then you are paying ${fmtC(toCall)} to see a card that beats you.`,
+      `Facing a raise with ${hole}. How much of the raiser's range do you beat at showdown? If you are behind most of it preflop, you are probably behind most of it postflop too.`,
+      `${hole} facing ${fmtC(toCall)} from ${pos}. The two clean options are fold and re-raise. Calling puts you in a squeeze: big price, out of position, with a hand that misses most flops.`,
+      `Facing a raise with ${hole}. When you call and miss the flop, you usually lose the money anyway — just slower. Is there a specific reason to call here rather than fold or re-raise?`,
+    ]);
+  }
+  else if(S.street==='river' && toCall>0 && b && (b.bucket==='medium'||b.bucket==='weak')){
+    q=pick([
+      `River call on ${boardP} with ${BUCKET_PHRASE[b.bucket]}. Does ${oppName||'your opponent'} ever bluff here? If they only bet rivers with strong hands, fold. If they fire rivers wide, call.`,
+      `${BUCKET_PHRASE[b.bucket]} on the river (${boardP}). Think about their entire line: flop, turn, river. Does that betting pattern look more like a value hand or a missed draw turned bluff?`,
+      `River decision with ${BUCKET_PHRASE[b.bucket]} on ${boardP}. Has ${oppName||'your opponent'} been betting all three streets, or did they wake up on the river? Sudden river bets from passive players are almost always value.`,
+      `Calling ${fmtC(toCall)} on the river with ${BUCKET_PHRASE[b.bucket]}. Replay the hand: what did ${oppName||'your opponent'} do on the flop and turn? Does this line point to value or a bluff?`,
+      `${BUCKET_PHRASE[b.bucket]} on ${boardP} — no more cards to improve. What specific hand worse than yours does ${oppName||'your opponent'} bet here on the river?`,
+      `River call with ${BUCKET_PHRASE[b.bucket]}. ${oppType==='station'?`${oppName} almost never bluffs rivers.`:oppType==='maniac'?`${oppName} fires rivers often with nothing — decent bluff-catch spot.`:oppType==='lag'?`${oppName} does barrel rivers sometimes. What is your gut read on this specific line?`:`Does ${oppName||'your opponent'} bluff rivers or just bet value?`}`,
+      `${BUCKET_PHRASE[b.bucket]} facing a river bet on ${boardP}. Two scenarios: strong hand (you lose) or bluff (you win). Based on how this hand was played, which is more likely?`,
+      `Final street, ${BUCKET_PHRASE[b.bucket]} on ${boardP}. What worse hands does ${oppName||'your opponent'} bet here? If you cannot name at least one plausible bluff, their range is pure value.`,
+    ]);
+  }
+  else if(toCall<=0 && S.street!=='pre' && b && (b.bucket==='strong'||b.bucket==='monster')){
+    q=pick([
+      `${BUCKET_PHRASE[b.bucket]} on ${boardP}. How much should you bet? Small bets build small pots. Big bets build big pots but may fold weaker hands. What size gets called by hands you beat?`,
+      `You have ${BUCKET_PHRASE[b.bucket]} and first to act on ${boardP}. Who is most likely to call a bet here and what might they have?${oppName?` ${oppName} is still in.`:''}`,
+      `${BUCKET_PHRASE[b.bucket]} on ${boardP}. The goal is maximum value from hands that beat you less. What would ${oppName||'your opponents'} call, and how big can you make the bet before they fold?`,
+      `Strong hand, first to act on ${boardP}. Small bets leave money on the table. Big bets might fold your customers. Find the size that extracts the most from the hands you beat.`,
+      `${BUCKET_PHRASE[b.bucket]} on ${boardP} — time to build the pot. Checking gives free cards. What is the biggest bet ${oppName||'the remaining players'} would call with a weaker hand?`,
+      `You have the best of it on ${boardP} with ${BUCKET_PHRASE[b.bucket]}. Betting too small gives draws a cheap price. Betting too big folds your customers. Size your bet for the specific players still in.`,
+      `${BUCKET_PHRASE[b.bucket]} and no one has bet on ${boardP}. Think about who would call and what with, then size to extract as much as possible from those weaker hands.`,
+      `${BUCKET_PHRASE[b.bucket]} on ${boardP}. Every street you check with a strong hand is a lost bet. Make ${oppName||'your opponents'} pay to be here and start building the pot you want to win.`,
+    ]);
+  }
+
+  if(!q){ el.style.display='none'; return; }
+  el.innerHTML = `<div class="eyebrow">Coach question</div>
+    <div class="question">${q}</div>
+    <div class="hint-actions">
+      <button class="hbtn dismiss" onclick="hideHint()">Got it, continue</button>
+    </div>`;
+  el.style.display='';
+}
+function updateEquity(p){
+  const badge = document.getElementById('eqbadge');
+  badge.style.display='';
+  badge.textContent='win % ...';
+  const nOpp = unfolded().filter(x=>!x.user).length;
+  setTimeout(()=>{
+    const eq = heroEquity(p.hole, S.board, nOpp);
+    badge.textContent = `win ~${eq.toFixed(0)}% vs ${nOpp} random`;
+  }, 30);
+}
+
+/* ---------- AI decisions ---------- */
+const AI_AGG = {station:0, nit:0, tag:1, lag:2, maniac:3};
+function aiPre(p, toCall){
+  const prof = PROF[p.type].pre;
+  const tier = tierOf(p.hole);
+  const pos = positionOf(p);
+  const adj = POS_ADJ[pos]||0;
+  const facingRaise = S.preRaises>0;
+  const limpers = S.players.filter(x=>!x.folded&&!x.out&&x.streetPut===S.bb&&x.id!==p.id&&positionOf(x)!=='BB').length;
+  const openTo = Math.round(S.bb*3 + limpers*S.bb);
+
+  // Short-handed adjustment: as the table shrinks, everyone must play wider.
+  // 6+ players = 0, 5 players = +1, 4 = +2, 3 = +3, heads-up = +4
+  const live = seatOrderFromBtn().length;
+  const shortAdj = Math.max(0, 6 - live);
+
+  // Stack-aware push/fold: tournament AI with 10 BB or less stops raise-folding
+  // and plays shove-or-fold like a real short stack would.
+  const bbDepth = (p.stack + p.streetPut) / S.bb;
+  if(S.mode==='tourney' && bbDepth <= 10){
+    const posRank = ({UTG:0,'UTG+1':0,'UTG+2':1,LJ:1,HJ:2,CO:3,BTN:4,SB:5,BB:2})[pos] ?? 2;
+    // Threshold: which hand tiers this AI will shove. Wider when later position,
+    // more aggressive type, very short stack, or short-handed table.
+    const thresh = 2 + Math.round(posRank*0.8) + AI_AGG[p.type] + (bbDepth<=5?2:0) + Math.ceil(shortAdj/2);
+    const shove = {act:'raise', to: p.streetPut + p.stack};
+    if(!facingRaise){
+      if(toCall<=0){ // BB option
+        if(tier <= Math.min(thresh, 4)) return shove;
+        return {act:'check'};
+      }
+      if(tier <= thresh) return shove;
+      return {act:'fold'};
+    }
+    // Facing a raise short-stacked: shove strong hands, call off when pot odds are huge
+    if(tier <= Math.max(1, thresh-2)) return shove;
+    const potNow = potTotal();
+    if(toCall >= p.stack){ // call would be all-in: needs decent equity
+      if(tier <= 5 || toCall/(potNow+toCall) < 0.3) return {act:'call'};
+      return {act:'fold'};
+    }
+    if(toCall/(potNow+toCall) < 0.22 && tier <= 7) return {act:'call'};
+    return {act:'fold'};
+  }
+
+  if(!facingRaise){
+    if(toCall<=0){ // BB option: check is always available
+      if(tier<=prof.open+Math.ceil(shortAdj/2) && rand()<.7) return {act:'raise', to:Math.round(S.bb*3.5)};
+      return {act:'check'};
+    }
+    if(tier <= prof.open + adj + shortAdj) return {act:'raise', to:openTo};
+    if(p.type==='station' && tier<=prof.limp+shortAdj && rand()<.8) return {act:'call'};
+    if(pos==='SB' && tier<=6+shortAdj && rand()<.3) return {act:'call'};
+    return {act:'fold'};
+  }
+  if(S.preRaises===1){
+    const tbTo = Math.round(S.currentBet*3);
+    if(tier<=prof.tb+Math.floor(shortAdj/2) && rand()<.8) return {act:'raise', to:tbTo};
+    if(prof.bluff3>0 && tier<=6 && rand()<prof.bluff3+shortAdj*0.03) return {act:'raise', to:tbTo};
+    const defBonus = pos==='BB' ? 2 : (pos==='SB' ? 1 : 0);
+    if(tier <= prof.call + Math.max(adj,0) + defBonus + Math.ceil(shortAdj/2)) return {act:'call'};
+    return {act:'fold'};
+  }
+  if(tier===1 && rand()<.55) return {act:'raise', to:Math.round(S.currentBet*2.4)};
+  if(tier<=prof.callTb+Math.floor(shortAdj/2)) return {act:'call'};
+  return {act:'fold'};
+}
+
+function aiPost(p, toCall){
+  const prof = PROF[p.type].post;
+  const b = bucketOf(p.hole, S.board);
+  const cls = ((b.bucket==='air'||b.bucket==='weak') && b.outs>=7) ? 'draw' : b.bucket;
+  const pot = potTotal();
+
+  if(toCall<=0){
+    let f = prof.bet[cls] ?? .05;
+    if(S.street==='flop' && S.preAggressor===p.id) f = Math.max(f, prof.cbet);
+    if(S.street==='river' && cls==='draw') f = .25;
+    if(rand()<f){
+      const frac = prof.size[0] + rand()*(prof.size[1]-prof.size[0]);
+      const to = Math.max(S.bb, Math.round(pot*frac));
+      return {act:'raise', to:Math.min(to, p.streetPut+p.stack)};
+    }
+    return {act:'check'};
+  }
+  const price = toCall/(pot+toCall);
+  const rch = prof.raise[cls]||0;
+  if(rand()<rch && p.stack > toCall*2.5){
+    return {act:'raise', to:Math.round(S.currentBet*2.7)};
+  }
+  const band = price<0.22?'cheap': price<0.36?'mid':'big';
+  let c = prof.call[band][cls] ?? 0;
+  if(cls==='draw' && S.street!=='river'){
+    const eq = b.outs*0.021;
+    if(price < eq + 0.06) c = Math.max(c,.88);
+    else if(price > eq + 0.15) c *= .4;
+  }
+  if(toCall>=p.stack) c *= prof.allinTighten;
+  if(rand()<c) return {act:'call'};
+  return {act:'fold'};
+}
+
+/* ---------- endings ---------- */
+async function finishByFolds(){
+  const w = unfolded()[0];
+  const pot = potTotal();
+  w.stack += pot;
+  S.lastWin = [w.id];
+  w.lastAct = 'wins '+fmtC(pot);
+  log(`${w.name} wins ${fmtC(pot)} — everyone else folded, no showdown needed`, true);
+  await endHand(false);
+}
+async function ensureFullBoard(){
+  while(S.board.length<5){
+    await sleep(450);
+    if(S.board.length===0){ S.street='flop'; S.board.push(S.deck.pop(),S.deck.pop(),S.deck.pop()); }
+    else { S.street = S.board.length===3?'turn':'river'; S.board.push(S.deck.pop()); }
+    H.board = S.board.map(cid).join(' ');
+    const stLabel2 = S.street==='flop'?'FLOP':S.street==='turn'?'TURN':'RIVER';
+    log(`${stLabel2}: ${S.board.map(cstr).join(' ')}`, true);
+    renderAll();
+  }
+}
+async function runout(){
+  unfolded().forEach(p=>p.revealed=true);
+  renderAll();
+  await ensureFullBoard();
+}
+async function showdown(){
+  const inHand = unfolded();
+  inHand.forEach(p=>{ p.revealed = true; });
+  if(!S.players[0].folded && !S.players[0].out){ H.flags.wtsd = true; }
+
+  inHand.forEach(p=>{
+    const ev = evalBest(p.hole.concat(S.board));
+    p.sdScore = ev.score; p.sdName = CAT_NAMES[ev.cat];
+  });
+
+  const contributors = S.players.filter(p=>p.handPut>0);
+  const levels = [...new Set(inHand.map(p=>p.handPut))].sort((a,b)=>a-b);
+  let prev = 0;
+  const winners = new Set();
+  for(const lvl of levels){
+    let potAmt = 0;
+    contributors.forEach(p=>{ potAmt += Math.max(0, Math.min(p.handPut,lvl)-prev); });
+    const elig = inHand.filter(p=>p.handPut>=lvl);
+    const best = Math.max(...elig.map(p=>p.sdScore));
+    const ws = elig.filter(p=>p.sdScore===best);
+    const share = Math.floor(potAmt/ws.length);
+    ws.forEach((w,i)=>{ w.stack += share + (i===0 ? potAmt-share*ws.length : 0); winners.add(w.id); });
+    prev = lvl;
+  }
+  S.lastWin = [...winners];
+  const wNames = inHand.filter(p=>winners.has(p.id));
+  wNames.forEach(w=>{ w.lastAct = 'wins'; });
+
+  // Build a clear showdown message
+  const allHandsStr = inHand.map(w=>`${w.name}: ${w.sdName}`).join(', ');
+  let resultMsg;
+  if(wNames.length > 1){
+    // Multiple winners: split pot, explain why
+    const potAmt = S.players.reduce((a,p)=>a+p.handPut,0);
+    resultMsg = `Showdown, cards revealed: ${allHandsStr}. Split pot: both players had the same best hand (${wNames[0].sdName}). Pot of ${fmtC(potAmt)} divided equally.`;
+  } else if(wNames.length===1){
+    const loserStr = inHand.filter(p=>!winners.has(p.id)).map(p=>`${p.name} had ${p.sdName}`).join(', ');
+    resultMsg = `Showdown: ${wNames[0].name} wins with ${wNames[0].sdName}${loserStr?` (${loserStr})`:''}`;
+  } else {
+    resultMsg = `Showdown, cards revealed: ${allHandsStr}`;
+  }
+  log(resultMsg, true);
+  if(winners.has(0)) H.flags.wonSd = true;
+  renderAll();
+  await endHand(true);
+}
+
+async function endHand(wasShowdown){
+  S.handActive = false;
+  const me = S.players[0];
+
+  const netC = me.stack - H.stackBefore;
+  H.netC = netC;
+  H.net = +( netC / S.bb ).toFixed(2);
+  H.flags.won = netC > 0;
+  H.result = netC>0 ? `won ${fmtC(netC)}` : netC<0 ? `lost ${fmtC(Math.abs(netC))}` : 'broke even';
+
+  if(!me.out){
+    const tally = s=>{
+      s.hands++;
+      if(H.flags.vpip)s.vpip++; if(H.flags.pfr)s.pfr++; if(H.flags.limped)s.limped++;
+      if(H.flags.tbOpp)s.tbOpp++; if(H.flags.threeBet)s.tb++;
+      if(H.flags.f3bOpp)s.f3bOpp++; if(H.flags.f3b)s.f3b++;
+      if(H.flags.cbetFaced)s.cbetFaced++; if(H.flags.foldCbet)s.foldCbet++;
+      if(H.flags.sawFlop)s.sawFlop++; if(H.flags.wtsd)s.wtsd++; if(H.flags.wonSd)s.wonSd++;
+      s.pBets+=H.pBets; s.pCalls+=H.pCalls;
+      s.netBB += H.net; if(H.flags.won)s.won++;
+    };
+    tally(SESSION); tally(DATA.life);
+    H.notes = coachNotes();
+    DATA.hands.push(compactRecord());
+    saveData();
+  }
+
+  if(S.mode==='tourney'){
+    S.handsAtLevel++;
+    S.players.forEach(p=>{ if(!p.out && p.stack<=0){ p.out=true; log(`${p.name} is eliminated`); } });
+    const alive = liveSeats();
+    if(me.out){
+      const place = alive.length+1;
+      S.finished = true;
+      log(`Tournament over. You finished ${ordinal(place)} of ${S.numPlayers}. Take your time reviewing the hand, then start a new game below.`, true);
+      endGameButtons();
+    } else if(alive.length===1){
+      S.finished = true;
+      log(`Tournament over. You win. Last player standing.`, true);
+      endGameButtons();
+    }
+  }
+
+  renderAll();
+  showCoach();
+}
+
+function compactRecord(){
+  return {id:H.id,t:H.t,mode:H.mode,pos:H.pos,bb:H.bb,hole:H.hole,board:H.board,
+          net:H.net,netC:H.netC,flags:H.flags,notes:H.notes,log:H.log.slice(0,60),result:H.result};
+}
+function ordinal(n){ return n+(['th','st','nd','rd'][((n%100-20)%10)]||['th','st','nd','rd'][n%100]||'th'); }
+
+/* =====================================================
+   COACHING ENGINE v2: specific, deduplicated, villain-aware
+   ===================================================== */
+function needPct(toCall, pot){ return Math.round(toCall/(pot+toCall)*100); }
+function stationIn(opp){ const s=(opp||[]).find(o=>o.endsWith(':station')); return s? s.split(':')[0] : null; }
+
+function coachNotes(){
+  const cands = [];
+  const A = H.acts;
+  const pre = A.filter(a=>a.street==='pre');
+  const post = A.filter(a=>a.street!=='pre');
+  const hole = prettyIds(H.hole);
+  const boardP = prettyIds(H.board);
+  const stackBB = Math.round(H.stackBefore / H.bb);
+
+  // ---- leak rules (priority 1-3) ----
+  if(H.flags.limped){
+    cands.push({key:'limp', p:1,
+      t: pick([
+        `You limped ${hole} from ${H.pos}. Raise to about ${fmtC(H.bb*3)} or fold. Limping builds no pot when you are ahead, gives the blinds a free look, and announces a weak hand.`,
+        `Limping ${hole} from ${H.pos} is a recurring leak. A raise to ${fmtC(H.bb*3)} does three things limping never can: it builds a pot while you are ahead, it can take the pot down preflop, and it gives you the initiative on the flop.`,
+        `${hole} from ${H.pos}: another limp. The problem is that you risk chips without any chance of winning before the flop. A raise to ${fmtC(H.bb*3)} can win it outright. A limp cannot.`,
+        `Limped ${hole} from ${H.pos}. Limping invites multiway pots where your hand is harder to play and easier to outdraw. Raise to ${fmtC(H.bb*3)} to narrow the field and keep the lead.`,
+        `${hole} from ${H.pos}: raise or fold, every time. Every limp gives the blinds a cheap look at a flop and builds a small pot you cannot easily win. Make it ${fmtC(H.bb*3)}.`,
+      ]),
+      short: pick([
+        `Limped again (${hole} from ${H.pos}). Same leak: raise or fold, no limping.`,
+        `Another limp (${hole}, ${H.pos}). Raise to ${fmtC(H.bb*3)} or fold every time.`,
+        `${hole} from ${H.pos}: that limp is still the leak. ${fmtC(H.bb*3)} or fold.`,
+      ])});
+  }
+  const firstVol = pre.find(a=>a.act==='call'||a.act==='raise');
+  if(firstVol && firstVol.tier>=6 && (H.pos==='UTG'||H.pos==='HJ') && !H.flags.limped){
+    cands.push({key:'looseEarly', p:2,
+      t: pick([
+        `${hole} from ${H.pos} is outside a solid opening range with ${H.pos==='UTG'?'five':'four'} players still behind you. Up front, stick to pairs, big aces, and strong broadways. Hands like this make money from the button, not from early position.`,
+        `Opening ${hole} from ${H.pos} is too loose. Early position ranges need to be tight because you play the whole hand without information. Players behind have position on you the entire hand.`,
+        `${hole} from ${H.pos} with multiple players behind: not strong enough for this seat. Keep early position opens to pairs, strong aces, and broadways. Save the speculative hands for when you have position.`,
+        `Playing ${hole} from ${H.pos} bleeds chips over time. Early position means the least information and the worst postflop position. Tighten your range here to hands you can continue with comfortably after a re-raise.`,
+        `${hole} from ${H.pos} is a marginal open at best. With ${H.pos==='UTG'?'five':'four'} players behind including the button and blinds, you are setting yourself up for a tough hand from a tough seat.`,
+      ]),
+      short: `${hole} from ${H.pos}: too loose for early position again.`});
+  }
+  const coldCall = pre.find(a=>a.act==='call' && a.toCall>H.bb);
+  if(coldCall && coldCall.tier>=6){
+    const v = coldCall.vs||'the raiser';
+    cands.push({key:'coldCall', p:2,
+      t: pick([
+        `Flat-calling ${v}'s raise with ${hole} is a long-term loser: you are paying ${fmtC(coldCall.toCall)} to play a weak hand against a range that has you beat. Fold it. If the raiser is tight, an occasional 3-bet beats calling.`,
+        `Calling ${v}'s raise with ${hole} is the passive play with a hand that does not warrant it. You paid a big price to enter a pot against a stronger range, likely out of position. Raise the hands worth playing or fold the rest.`,
+        `${hole} vs a ${v} raise: a cold call puts you in the worst spot in poker. Weak hand, big price, probably out of position, against someone who showed strength. Fold or 3-bet.`,
+        `Cold-calling with ${hole} gives ${v} every advantage: they showed strength, you called with weaker, and now you guess what they have for the rest of the hand. Raise the hands worth playing; fold the rest.`,
+        `That call with ${hole} versus ${v}'s raise is an expensive habit. Every time you flat-call below the 3-bet threshold, you play a guessing game postflop with worse cards and less information.`,
+      ]),
+      short: `Called a raise with ${hole} again. Weak hands vs raising ranges bleed chips.`});
+  }
+  for(const a of post){
+    if(a.act==='call' && (a.bucket==='air'||a.bucket==='weak') && a.outs>0 && a.street!=='river'){
+      const eq = Math.round(a.outs*2.1);
+      const need = needPct(a.toCall, a.pot);
+      if(need > eq + 10){
+        cands.push({key:'chase', p:1,
+          t: pick([
+            `${a.street.charAt(0).toUpperCase()+a.street.slice(1)}, board ${boardP}: you called ${fmtC(a.toCall)} into a pot of ${fmtC(a.pot)} chasing your ${a.draws.join(' and ')}. The price required about ${need}% equity; ${a.outs} outs is roughly ${eq}%. Quick math: outs times 2 per card to come. If the price beats that number, fold.`,
+            `Chasing your ${a.draws.join(' and ')} on the ${a.street} cost ${fmtC(a.toCall)} into ${fmtC(a.pot)}. You needed ${need}% equity but had about ${eq}%. Rule: outs × 2 = approximate equity per card. When the price exceeds that, let the draw go.`,
+            `${a.street.charAt(0).toUpperCase()+a.street.slice(1)} draw chase: ${a.outs} outs gives roughly ${eq}% equity, but you paid for ${need}%. Over time, calling more than a draw is worth costs a lot of chips. Fold when the math does not work.`,
+            `Called ${fmtC(a.toCall)} on the ${a.street} with ${a.outs} draw outs. Your equity was about ${eq}%, but you needed ${need}% to break even. That is a ${need-eq}% shortfall. Fast check: outs × 2. If the price in percent is higher, fold the draw.`,
+            `Draw call on the ${a.street}: ${a.outs} outs to your ${a.draws[0]} means roughly ${eq}% to hit next card. You needed ${need}% to call profitably. Good draws are still folds when the pot does not give you the right price.`,
+          ])
+        });
+        break;
+      }
+    }
+  }
+  for(const a of post){
+    if(a.act==='call' && (a.bucket==='air'||a.bucket==='weak') && a.outs<4 && a.toCall > a.pot*0.55){
+      const v = a.vs||'your opponent';
+      const vt = a.vsType||'';
+      let read = '';
+      if(vt==='station'||vt==='nit'||vt==='tag') read = ` ${v} is ${vt==='station'?'a calling station':vt==='nit'?'a nit':'a TAG'}; big bets from passive or tight players are almost pure value.`;
+      else if(vt==='lag'||vt==='maniac') read = ` ${v} bluffs plenty, but with ${BUCKET_PHRASE[a.bucket]} you lose to their value hands and beat almost none of their bluffs anyway.`;
+      cands.push({key:'bigCallWeak', p:1,
+        t: pick([
+          `You called ${fmtC(a.toCall)} on the ${a.street} (board ${boardP}) holding ${BUCKET_PHRASE[a.bucket]}.${read} Save those chips for spots where you can actually win the pot.`,
+          `${fmtC(a.toCall)} call on the ${a.street} with ${BUCKET_PHRASE[a.bucket]} on ${boardP}.${read} Without equity or fold equity, the chips just transfer to the other side.`,
+          `Calling ${fmtC(a.toCall)} with ${BUCKET_PHRASE[a.bucket]} on ${boardP} is a leak.${read} To justify a call you need hand equity or fold equity. Here you had neither.`,
+          `That ${fmtC(a.toCall)} call with ${BUCKET_PHRASE[a.bucket]} on the ${a.street} (${boardP}) is exactly the spot to fold.${read} Discipline on these laydowns is where winning players build their edge.`,
+          `Calling ${fmtC(a.toCall)} with ${BUCKET_PHRASE[a.bucket]} on ${boardP} bleeds chips slowly.${read} When you have neither equity nor a bluff-catch, there is nothing to prop up the call.`,
+        ])
+      });
+      break;
+    }
+  }
+  const monsterActs = post.filter(a=>a.bucket==='monster');
+  if(monsterActs.length>=2 && !monsterActs.some(a=>a.act==='bet'||a.act==='raise')){
+    const sIn = stationIn(monsterActs[0].opp);
+    cands.push({key:'passiveMonster', p:2,
+      t: pick([
+        `You made ${BUCKET_PHRASE.monster} on ${boardP} and never bet or raised. One slowplay street can be fine; passive lines all hand leave money behind${sIn?` — ${sIn} the calling station would have paid you on every street`:''}. Bet your monsters.`,
+        `${BUCKET_PHRASE.monster} on ${boardP} and you checked through multiple streets. The risk of slowplaying is that your opponents do not improve enough to pay you, or they sense something wrong and check back. Bet big hands.`,
+        `You trapped with ${BUCKET_PHRASE.monster} on ${boardP} but never fired. Trapping works against aggressive players; against passive ones it just loses bets.${sIn?` ${sIn} would have called big bets here.`:''}`,
+        `${BUCKET_PHRASE.monster} and zero aggression on ${boardP}. The time to build pots is when you have a hand. Passive lines with strong holdings leave value on the table${sIn?`, especially against ${sIn} who calls anything`:''}.`,
+        `Checked your monster on ${boardP} all the way through. Slow-playing has its place but not across every street. The goal with a big hand is to get stacks in, not to see if opponents improve by accident.`,
+      ])
+    });
+  }
+  const rv = post.find(a=>a.street==='river' && (a.bucket==='strong'||a.bucket==='monster') && a.act==='check');
+  if(rv && !cands.some(c=>c.key==='passiveMonster')){
+    const half = fmtC(Math.round(rv.pot/2));
+    const sIn = stationIn(rv.opp);
+    cands.push({key:'missedValue', p:3,
+      t: pick([
+        `River, board ${boardP}: you checked ${BUCKET_PHRASE[rv.bucket]}. The question on every river is whether worse hands call a bet. ${sIn?`Against ${sIn} the answer is yes every time.`:'Here the answer was probably yes.'} A bet around ${half} gets paid more often than it gets punished.`,
+        `You checked back ${BUCKET_PHRASE[rv.bucket]} on the river (${boardP}). That is a missed value bet. On the river, your hand does not get better. Either bet for value now or accept that you gave up a bet.${sIn?` ${sIn} calls almost every river bet.`:''}`,
+        `River check with ${BUCKET_PHRASE[rv.bucket]} on ${boardP}. Value bets on the river are pure profit when worse hands call. ${sIn?`${sIn} is exactly the opponent who calls a ${half} bet with second pair.`:`A bet around ${half} should get paid here.`}`,
+        `Missed a river bet with ${BUCKET_PHRASE[rv.bucket]} on ${boardP}. By the river, opponents' ranges are defined. When you have a strong hand, bet an amount the second-best hands will call. Checking gives it away.`,
+        `${BUCKET_PHRASE[rv.bucket]} on the river and you checked. Ask this question every time: what worse hand calls a bet? ${sIn?`${sIn} calls with almost any pair.`:'If the answer is at least one hand, bet.'} A ${half} bet here had real value.`,
+      ])
+    });
+  }
+  // missed c-bet as preflop raiser
+  const flopCheck = post.find(a=>a.street==='flop' && a.act==='check' && a.toCall===0);
+  if(H.flags.pfr && flopCheck && flopCheck.bucket!=='monster' && H.flags.sawFlop){
+    const third = fmtC(Math.round(flopCheck.pot/3));
+    const half = fmtC(Math.round(flopCheck.pot/2));
+    const boardCards = prettyIds(H.board.split(' ').slice(0,3).join(' '));
+    cands.push({key:'missedCbet', p:3,
+      t: pick([
+        `You raised preflop (taking the lead) then checked the flop ${boardCards} without betting. A continuation bet, or c-bet, is a follow-up bet after raising preflop. It works because your preflop raise said you have a strong hand, so a flop bet continues that story even if you missed. Betting ${third} to ${half} here would have made opponents decide whether to call. Many would fold. Checking let everyone see the turn for free.`,
+        `Raised preflop then checked the flop ${boardCards}. A c-bet of ${third} to ${half} continues your preflop story. Even when you miss, opponents have to worry about overpairs, top pair, and sets in your range. Many fold without a strong hand.`,
+        `Preflop raiser, then check on ${boardCards}. This is a missed c-bet. Flop is where preflop aggression pays off: your raise built a pot and said you have a hand. Checking gives everyone a free card and signals weakness. A bet of ${third} collects the pot when everyone else also missed.`,
+        `You raised before the flop and then checked ${boardCards}. That is the opposite of a continuation bet. Opponents know you either missed or slowed down. A bet of ${third} to ${half} would have applied pressure while you still had the initiative.`,
+        `Checked the flop ${boardCards} after raising preflop. C-bets work because opponents know you might have connected — top pair, an overpair, a set. When you bet, they decide with that uncertainty. When you check, you remove it and let them play with full information.`,
+      ])
+    });
+  }
+  // bluffing a station
+  for(const a of post){
+    if((a.act==='bet'||a.act==='raise') && (a.bucket==='air') && a.outs<4){
+      const sIn = stationIn(a.opp);
+      if(sIn){
+        cands.push({key:'bluffStation', p:2,
+          t: pick([
+            `You fired ${fmtC(a.amt)} at the ${a.street} with ${BUCKET_PHRASE.air}, with ${sIn} still in the hand. ${sIn} is a calling station: stations call, so bluffs into them are burned money. Bluff the players who actually fold (nits and TAGs). Value bet the callers.`,
+            `Bluffed ${sIn} on the ${a.street} with ${BUCKET_PHRASE.air}. Calling stations do not fold to bets — that is literally their defining trait. Bluffing them just donates chips. Save aggression for opponents who can actually fold.`,
+            `${fmtC(a.amt)} bluff on the ${a.street} with ${BUCKET_PHRASE.air} against ${sIn}. Rule: bluff the folders, value bet the callers. ${sIn} is a caller. Your bluff needed them to fold, and they almost never do.`,
+            `Bet ${fmtC(a.amt)} on the ${a.street} with nothing, into ${sIn}. Stations call with any pair, any draw, sometimes just a high card. Bluffing them wastes money. Against ${sIn}, aggression only makes sense when you have a hand.`,
+            `Fired air into ${sIn} on the ${a.street}. Against a calling station, your bluff has almost no chance of working. The winning move against ${sIn} is to value bet relentlessly when you have a hand, and check when you do not.`,
+          ])
+        });
+        break;
+      }
+    }
+  }
+  // tournament short stack
+  if(H.mode==='tourney' && stackBB<=15 && (H.flags.limped || (coldCall && coldCall.toCall<=H.bb*3))){
+    cands.push({key:'shortStack', p:1,
+      t: pick([
+        `You started this hand with ${stackBB} big blinds. That is shove-or-fold territory: limping and flat-calling burn the fold equity a short stack lives on. Pick hands worth your whole stack and move in.`,
+        `${stackBB} big blinds is push-or-fold depth. Limping or calling small is the worst of both worlds: you commit chips without the fold equity of a shove, and then play a tough postflop hand short-stacked.`,
+        `At ${stackBB} BB, every chip is fold equity. Limping or calling small wastes it. When a hand is worth playing, shove. When it is not, fold. There is no middle ground at this depth.`,
+        `${stackBB} big blinds: shove or fold. Limping here costs the chips that make opponents fold to your shoves. If a hand is not worth going all-in with, it is not worth entering the pot at all.`,
+        `Short stack (${stackBB} BB) and you limped or called small. Push-or-fold means exactly that: no in-between. Pick hands that are worth your whole stack and put them in. Everything else is a fold.`,
+      ])
+    });
+  }
+  // missed steal
+  if(!H.flags.vpip && pre.length && pre[0].unopened && (H.pos==='BTN'||H.pos==='CO'||H.pos==='SB')){
+    const t1 = H.blinds&&H.blinds[0]?H.blinds[0]:null, t2 = H.blinds&&H.blinds[1]?H.blinds[1]:null;
+    const tightBlinds = [t1,t2].filter(x=>x&&(x.t==='nit'||x.t==='tag'));
+    if(pre[0].tier<=6 && tightBlinds.length>=1 && rand()<.6){
+      cands.push({key:'steal', p:3,
+        t: pick([
+          `Folded ${hole} from the ${H.pos} when it was unopened with ${tightBlinds.map(x=>x.n).join(' and ')} in the blinds. ${tightBlinds.length>1?'Both':'That seat'} fold${tightBlinds.length>1?'':'s'} far too often: raising a wide range here picks up the blinds over and over. Stealing is where late position prints.`,
+          `${H.pos} with ${hole} unopened and tight players in the blinds. This is exactly the spot to raise. ${tightBlinds.map(x=>x.n).join(' and ')} fold${tightBlinds.length>1?'':'s'} to late-position raises consistently. A raise to ${fmtC(H.bb*3)} here wins the pot more often than not.`,
+          `Missed a steal from ${H.pos} with ${hole}. When it folds to you in late position with tight players in the blinds, that is free money. You do not need a strong hand to steal — you need fold equity, and tight opponents give you plenty.`,
+          `Folded ${hole} from ${H.pos} into tight blinds. ${tightBlinds.map(x=>x.n).join(' and ')} fold to pressure. Raising here is not gambling; it is applying math. Most of the time they fold and you take the pot for free.`,
+          `${H.pos} fold with ${hole}, tight blinds waiting. This hand was playable as a steal. ${tightBlinds.map(x=>x.n).join(' and ')} defend narrow ranges and give up to pressure. A raise to ${fmtC(H.bb*3)} here has strong equity even if called.`,
+        ])
+      });
+    }
+  }
+  // ---- open sizing rules ----
+  const userOpen = pre.find(a=>a.act==='raise' && a.unopened);
+  if(userOpen && userOpen.to > 0){
+    const xBB = userOpen.to / H.bb;
+    if(xBB <= 2.1 && H.stackBefore/H.bb > 12){
+      cands.push({key:'minRaise', p:3,
+        t: pick([
+          `You opened ${hole} with a min-raise to ${fmtC(userOpen.to)}. Min-raises give the blinds an irresistible price to call, so you end up in multiway pots with no information. A standard open is 2.5x to 3x the big blind (${fmtC(Math.round(H.bb*2.5))} to ${fmtC(H.bb*3)} here). Make them pay to see a flop.`,
+          `Min-raised ${hole} to ${fmtC(userOpen.to)}. That price is too cheap: every hand in the blinds can call profitably, so you build a multiway pot with your range exposed. Standard opens run ${fmtC(Math.round(H.bb*2.5))} to ${fmtC(H.bb*3)} for a reason.`,
+          `Opened to ${fmtC(userOpen.to)} with ${hole}, less than 2.5x the big blind. Min-raises accomplish everything a limp does wrong: cheap flop for the field, no fold equity, small pot. Size to ${fmtC(Math.round(H.bb*3))} minimum.`,
+          `Your open with ${hole} was only ${fmtC(userOpen.to)}. Minimum raises are weak opens — opponents get great pot odds to call with almost any hand. Charge them ${fmtC(Math.round(H.bb*3))} instead and make them earn it.`,
+          `${fmtC(userOpen.to)} open with ${hole} is a min-raise. The blinds can call profitably with nearly any two cards at that price, flooding the pot with dead-equity hands you have to navigate on a flop. Open to ${fmtC(Math.round(H.bb*3))}.`,
+        ])
+      });
+    } else if(xBB >= 4.6 && userOpen.to < H.stackBefore*0.5){
+      cands.push({key:'overOpen', p:3,
+        t: pick([
+          `Your open with ${hole} was ${fmtC(userOpen.to)}, about ${Math.round(xBB*10)/10}x the big blind. Oversized opens fold out all the worse hands that would have paid you and only get action from hands that beat you. Stick to 2.5x to 3.5x unless you are deliberately shoving.`,
+          `Opened ${hole} to ${fmtC(userOpen.to)}, which is ${Math.round(xBB*10)/10}x the big blind — too big. You scare away the hands you want to play against and only get called by hands that have you in trouble. Keep it at 2.5x to 3.5x.`,
+          `${fmtC(userOpen.to)} open with ${hole} (${Math.round(xBB*10)/10}x BB) is oversized. When you raise huge, weaker hands fold and only strong hands call. You build a big pot against a strong range. Open smaller and get paid by more of the field.`,
+          `Opening ${hole} to ${fmtC(userOpen.to)} is ${Math.round(xBB*10)/10}x the big blind. That size self-selects the field to hands that beat you. Standard 2.5x to 3.5x keeps weak hands in and builds pots against inferior ranges.`,
+        ])
+      });
+    }
+  }
+  // ---- multiway caution ----
+  const multiAct = post.find(a=>(a.act==='call'||a.act==='bet') && (a.bucket==='weak'||a.bucket==='medium') && a.opp && a.opp.length>=3);
+  if(multiAct){
+    cands.push({key:'multiway', p:3,
+      t: pick([
+        `You put chips in on the ${multiAct.street} with ${BUCKET_PHRASE[multiAct.bucket]} against ${multiAct.opp.length} opponents. Hand values drop sharply multiway: a hand that wins 60% heads-up might win 30% against three players. In multiway pots, tighten up and only continue with strong hands and big draws.`,
+        `${BUCKET_PHRASE[multiAct.bucket]} in a ${multiAct.opp.length}-way pot on the ${multiAct.street}. Multiway, you need a stronger hand to continue. Every extra opponent cuts into your equity. Medium-strength hands that are fine heads-up become folds against multiple players.`,
+        `Committed chips on the ${multiAct.street} with ${BUCKET_PHRASE[multiAct.bucket]} against ${multiAct.opp.length} players. Rule for multiway pots: tighten significantly. You need top pair or better; weaker hands have too many ways to lose.`,
+        `${multiAct.opp.length} opponents on the ${multiAct.street} and you continued with ${BUCKET_PHRASE[multiAct.bucket]}. Multiway equity collapses fast. What beats a pair heads-up often beats it multiple times in a multiway pot.`,
+        `${BUCKET_PHRASE[multiAct.bucket]} against ${multiAct.opp.length} players on the ${multiAct.street}. In multiway pots, one of those opponents is statistically likely to have you beat. Reserve your aggression for hands that clearly dominate a multiway board.`,
+      ])
+    });
+  }
+  // ---- river value bet (positive) ----
+  const rivBet = post.find(a=>a.street==='river' && (a.act==='bet'||a.act==='raise') && (a.bucket==='strong'||a.bucket==='monster'));
+  if(rivBet && H.flags.won && rand()<.5){
+    cands.push({key:'riverValue', p:4,
+      t: pick([
+        `Nice river bet of ${fmtC(rivBet.amt||rivBet.to)} with ${BUCKET_PHRASE[rivBet.bucket]}. The river is where the money is made: most players check back strong hands and miss a full bet of value. You did not. Keep asking on every river: what worse hands call me here?`,
+        `Good river value bet with ${BUCKET_PHRASE[rivBet.bucket]}. Most players check strong river hands out of fear. You bet and got paid. That habit — betting rivers for value — is one of the biggest separators between break-even and winning players.`,
+        `River bet of ${fmtC(rivBet.amt||rivBet.to)} with ${BUCKET_PHRASE[rivBet.bucket]}: well done. The river is not a street to coast on. Betting for value on the final street and getting called is exactly how you build a positive win rate.`,
+        `You value bet the river with ${BUCKET_PHRASE[rivBet.bucket]} and it paid off. That is correct play and one a lot of players miss — they get to the river with a strong hand and check or bet too small. Keep sizing confidently when you have the best of it.`,
+        `${BUCKET_PHRASE[rivBet.bucket]} on the river and you went for value. Smart. River value bets multiply your earnings on every strong hand. Players who check back strong river hands leave a huge amount of money behind over a session.`,
+      ])
+    });
+  }
+  // ---- BB free play (positive) ----
+  if(H.pos==='BB' && !H.flags.pfr && H.flags.sawFlop && H.flags.won && pre.every(a=>a.act==='check'||a.toCall===0) && rand()<.4){
+    cands.push({key:'bbFree', p:4,
+      t: pick([
+        `Won with ${hole} from the BB after checking your option. Free flops in the big blind are pure profit opportunities: you invested nothing extra and took the pot. The skill is recognizing when your free flop connected and betting it.`,
+        `Big blind free play with ${hole} — and you won it. This is the beauty of the BB: sometimes you get to see a flop at no extra cost and cash in. The key is acting on it when the board connects. You did.`,
+        `Took the pot from the BB after getting a free flop with ${hole}. Smart play. Free looks in the big blind are value you already paid for with your blind. When the flop helps you, make opponents pay for staying in.`,
+        `Won from the BB with a free flop. ${hole} connected and you took it down. Profitable pattern: check the option, flop something, bet it. You found the value already sitting in your blind.`,
+        `Checked your BB option and ended up winning the hand with ${hole}. Free flops in the big blind are opportunities other positions never get. Recognizing when those free flops give you a strong hand is a real skill.`,
+      ])
+    });
+  }
+
+  // ---- positive reinforcement (priority 4) ----
+  if(!H.flags.wtsd && H.flags.won && H.pBets>0){
+    cands.push({key:'goodAggro', p:4,
+      t: pick([
+        `Won ${fmtC(Math.abs(H.netC))} without showdown after taking the lead. That is the whole point of aggression: you collect pots you would have lost at showdown. Keep putting opponents to decisions.`,
+        `Won the hand before showdown with ${hole}. Aggression wins pots two ways: best hand at showdown, or everyone folds. You took the second path — winning without having to be right about your hand.`,
+        `Collected ${fmtC(Math.abs(H.netC))} without showing cards. When you bet and everyone folds, you win regardless of what you held. Aggressive players manufacture these wins constantly. Passive players never do.`,
+        `Took down the pot without a showdown. That is what aggression buys: the ability to win hands you might not win at showdown. Keep applying pressure in spots where opponents are likely to give up.`,
+        `Won ${fmtC(Math.abs(H.netC))} by making opponents fold. This is efficient poker — you did not need to have the best hand, you just needed to be the one still standing. Aggression creates those outcomes.`,
+      ])
+    });
+  }
+  const goodFold = post.find(a=>a.act==='fold' && (a.bucket==='air'||a.bucket==='weak') && a.toCall>a.pot*0.5 && a.pot>H.bb*8);
+  if(goodFold && rand()<.5){
+    cands.push({key:'goodFold', p:4,
+      t: pick([
+        `Disciplined fold on the ${goodFold.street} holding ${BUCKET_PHRASE[goodFold.bucket]} against ${goodFold.vs||'a big bet'} of ${fmtC(goodFold.toCall)}. Chips you do not lose count exactly the same as chips you win.`,
+        `Good laydown on the ${goodFold.street} with ${BUCKET_PHRASE[goodFold.bucket]}. Facing a big bet with little equity, folding is the only play that profits over time. Most players make that call and wonder where their chips went.`,
+        `Folded ${BUCKET_PHRASE[goodFold.bucket]} into a big bet on the ${goodFold.street}. That discipline is underrated. Every chip saved against a bet you cannot beat is the same as winning that chip. Tough folds matter.`,
+        `Clean fold with ${BUCKET_PHRASE[goodFold.bucket]} on the ${goodFold.street}. You avoided calling a big bet just to see cards. When the price is too high and your hand too weak, folding is the winning play.`,
+        `Good fold on the ${goodFold.street}. ${BUCKET_PHRASE[goodFold.bucket]} against a big bet is a losing call over time. Recognizing that and getting out is the same skill as making a value bet — it just goes in the opposite direction.`,
+      ])
+    });
+  }
+
+  // ---- fallback: always review the key decision ----
+  if(!cands.length){
+    const fb = keyDecisionNote(hole, boardP);
+    if(fb) cands.push(fb);
+  }
+
+  // ---- selection with dedupe ----
+  cands.sort((a,b)=>a.p-b.p);
+  const fresh = cands.filter(c=>!recentNoteKeys.includes(c.key));
+  let picked = (fresh.length?fresh:cands).slice(0,2);
+  if(!fresh.length && picked[0] && picked[0].short){
+    picked = [Object.assign({},picked[0],{t:picked[0].short})];
+  }
+  picked.forEach(c=>recentNoteKeys.push(c.key));
+  if(recentNoteKeys.length>10) recentNoteKeys = recentNoteKeys.slice(-10);
+  return picked.map(c=>c.t);
+}
+
+function keyDecisionNote(hole, boardP){
+  const A = H.acts;
+  if(!A.length) return null;
+
+  // ---- PREFLOP FOLD: never voluntarily played ----
+  if(!H.flags.vpip){
+    const a = A[0];
+    const t = a.tier||8;
+    const pos = H.pos;
+    const ranks = hole.split(' ');
+    const r1 = ranks[0]||'', r2 = ranks[1]||'';
+    const hasAce = hole.includes('A');
+    const hasPair = r1[0]===r2[0];
+    const suited = r1.slice(-1)===r2.slice(-1);
+
+    // Position-specific range edge for BB
+    const edgeMap = {
+      UTG:'strong pairs (77+), big aces (AJ+), and KQs',
+      'UTG+1':'pairs 66+, ATs+, AJo+, and KQs',
+      'UTG+2':'pairs 55+, A9s+, ATo+, KQs, KJs',
+      LJ:'pairs 44+, any suited ace, ATo+, KQs, KJs',
+      HJ:'pairs 33+, any suited ace, ATo+, KJs, QJs',
+      CO:'any pair, any ace, KT+, QJ+, suited connectors',
+      BTN:'roughly the top 40%: any pair, any ace, any broadway, suited connectors',
+      SB:'any pair, any ace, K9+, Q9+, and suited hands',
+      BB:'you already paid, so defend any pair, suited hands, connected cards, and broadway',
+    };
+    const edge = edgeMap[pos]||'strong hands from your position';
+
+    // Tier-based messages with variety
+    if(t<=3){
+      return {key:'preFoldClose', p:3, t: pick([
+        `${hole} from ${pos} is borderline. A solid ${pos} range includes ${edge}. This hand sits right at the edge. Folding it repeatedly drags your VPIP below 20 percent, which means you are leaving steal opportunities behind.`,
+        `${hole} from ${pos}: a fold most of the time but barely. The ${pos} range includes ${edge}, and this hand is just outside that. Worth knowing the line so you can open it from a better spot.`,
+        `Close fold with ${hole} from ${pos}. The ${pos} opening range goes down to ${edge}. You made the right call but it is not a clear fold. When you are in late position, this hand is usually a raise.`,
+        `${hole} from ${pos} is right on the edge of playable. Folding is fine, but do not make it a habit — if you fold this hand from every position, your range becomes too predictable and too tight.`,
+        `Borderline fold: ${hole} from ${pos}. The ${pos} range includes ${edge}. This hand is just below that threshold. From a later position this is an open; from ${pos} folding is defensible.`,
+        `${hole} from ${pos} is close. The standard ${pos} range reaches down to ${edge}. This is at or just below that line. Do not overthink close folds — make a decision and move on.`,
+      ])};
+    }
+
+    if(t===4){
+      if(pos==='BTN'||pos==='CO'||pos==='SB'){
+        return {key:'preFoldMid', p:4, t: pick([
+          `${hole} from ${pos} looks playable but falls under a solid ${pos} range (${edge}). From this position you want hands with high-card strength or connected potential. ${hole} does not fit that profile well enough.`,
+          `Folded ${hole} from ${pos}. That seat allows wide steals, but ${hole} has low card values and limited postflop potential. The best steal hands have at least one face card or are suited. This one just misses.`,
+          `${hole} from ${pos}: marginal fold. The range here opens wide (${edge}), but ${hole} lacks either high-card strength or the suited/connected upside to justify it. Clean fold.`,
+          `Folded ${hole} from ${pos}. This position opens wide, but ${hole} is below the floor because it has no face cards, no pair potential, and limited connected value. You need some raw material to steal with.`,
+          `${hole} from ${pos} is right below the opening threshold. The suited or connected hands that steal best have clear equity if called. ${hole} does not give you that backup.`,
+        ])};
+      }
+      if(pos==='BB'){
+        return {key:'preFoldBB', p:4, t: pick([
+          `${hole} in the BB. You defend against raises with any pair, suited hands, and connected cards. ${suited?'The suited aspect helps a bit':'Neither card is particularly strong'}, but ${hole} is short of a profitable defend. Folding to a raise here is fine.`,
+          `${hole} from the BB facing a raise. The BB defend range is wide, but ${hole} lacks the raw strength or drawing potential to call profitably. You would miss most flops and have no strong draw to fall back on.`,
+          `BB fold with ${hole}. The BB defends many hands, but ${hole} has ${suited?'only the suited upside':'no notable upside'} — not enough to justify calling a raise and playing the whole hand out of position.`,
+          `${hole} in the BB: folding to a raise is correct. The price is attractive since you already have chips in, but ${hole} connects poorly with most boards and does not have the high-card strength to make up for it.`,
+        ])};
+      }
+    }
+
+    // Clear junk fold (tier 5-8) with varied messages
+    const junkMsgs = {
+      UTG:[
+        `${hole} from UTG: correct fold. UTG is the tightest seat at a ${S.numPlayers}-handed table. You had ${S.numPlayers-1} players still to act. From here you only open with ${edge}. Junk from early position bleeds chips slowly over a session.`,
+        `Folded ${hole} from UTG. Smart. With ${S.numPlayers-1} players left to act, that hand would be in trouble against any caller or re-raiser. UTG opens need to be hands you are happy to see called: ${edge}.`,
+        `${hole} from UTG at ${S.numPlayers}-handed is an easy fold. You are first to act with maximum information disadvantage. Save the chips for when you have position and a real hand.`,
+        `Good fold with ${hole} from UTG. First to act, no information about anyone else's hand, ${S.numPlayers-1} players to speak. You only open the strongest ${S.numPlayers===9?'10':'12'} percent of hands from here.`,
+        `${hole} from UTG: right call. The early position ranges exist because you play the whole hand out of position against anyone who calls. Weak hands in that spot lose small amounts relentlessly. Keep it tight.`,
+        `Correct fold UTG with ${hole}. Early position is where leaky players bleed chips. Playing junk from UTG means you get to the flop out of position with a hand that misses most boards and cannot stand pressure.`,
+      ],
+      'UTG+1':[
+        `${hole} from UTG+1: right fold. Still very early with most of the table behind you. The ${pos} range runs about ${edge}. This hand is well short of that.`,
+        `Correct fold with ${hole} from ${pos}. Not enough here to open from this position and be comfortable facing a 3-bet or a bad flop out of position.`,
+        `${hole} from UTG+1: fold. One less player than UTG but still a tight seat. The hands that open from here need to play well against 3-bets and in multiway pots. ${hole} does neither.`,
+        `Folded ${hole} from UTG+1. The range here is ${edge}. This hand is below that, and opening it means playing guessing games postflop against opponents who have you beat.`,
+        `Good fold UTG+1 with ${hole}. Second to act, most of the table behind you. Opening weak hands from this position sets up bad postflop situations that cost chips over time.`,
+      ],
+      'UTG+2':[
+        `${hole} from ${pos}: fold. Still early position. You want at least some combination of high cards, a pair, or suited connectors to open from here.`,
+        `Folded ${hole} from ${pos}. Good. Opening junk from middle-early position puts you in tough spots postflop against multiple players who likely have you beat.`,
+        `${hole} from UTG+2: correct. Getting closer to middle position but still early enough that tight play is right. The range here is ${edge}. This is below that.`,
+        `Good fold: ${hole} from ${pos}. You are still acting early with players behind who can have strong hands. Until you are past the halfway point, keep your range tight and your hands playable.`,
+        `${hole} from ${pos}: the range here opens wider than UTG but ${hole} still falls short. It has no high-card strength, no pair potential, and limited connected value. Clear fold.`,
+      ],
+      LJ:[
+        `${hole} from the Lojack: fold. Four players still behind you including the two best seats. This hand does not have enough raw strength or suited potential to open from here.`,
+        `Folded ${hole} from LJ. Correct. The LJ range includes ${edge}. This falls well short of that threshold.`,
+        `${hole} from LJ: right fold. The CO, BTN, and both blinds are behind you. You need a hand that plays well in position or multiway. ${hole} does not have the tools.`,
+        `Folded ${hole} from the Lojack. The LJ is where you start to see the transition toward middle position. But ${hole} is below the opening floor here. You need at least one face card or connected, suited cards.`,
+        `Good fold LJ with ${hole}. Four players still act behind you including the button, which has position on you the entire hand. Keep your range tight enough that you play well against callers.`,
+      ],
+      HJ:[
+        `${hole} from HJ: fold. Still three players behind including the CO and BTN who will have position on you the whole hand. You need real hand strength or a good suited connector from this seat.`,
+        `Folded ${hole} from the Hijack. Good. The HJ opens ${edge}. This hand is under that, and playing junk from HJ usually means losing a pot out of position.`,
+        `${hole} from HJ: correct fold. The hijack is where ranges start to open up, but ${hole} is below the opening floor. From here you want connected hands, any pair, or a face card.`,
+        `Good fold with ${hole} from the Hijack. The CO and BTN behind you have position on you postflop. A weak hand out of position against two potentially strong ranges is a bad spot.`,
+        `Folded ${hole} from HJ. The hijack opens wider than early position but ${hole} still misses the cut. It has no real equity when called and gives up fold equity too quickly.`,
+      ],
+      CO:[
+        `${hole} from the CO: on the edge. The CO can open ${edge}. ${hole} is ${t<=5?'close to the bottom of that range':'under that range'}. From the cutoff you generally want at least one face card or suited cards.`,
+        `Folded ${hole} from CO. The cutoff is a prime attacking seat, but ${hole} does not have enough raw equity to justify it. The button and blinds will call or 3-bet with hands that dominate this.`,
+        `${hole} from CO: fold is fine. The cutoff opens wide, but ${hole} lacks the high-card strength or suited upside to make it profitable. You need something to work with when called.`,
+        `Correct fold from the CO with ${hole}. Even though the cutoff lets you open around 25 percent of hands, ${hole} sits below that floor. It cannot generate enough equity if called to justify the investment.`,
+        `${hole} from CO: right call. The cutoff is your second-best steal position, but steal hands need a floor of playability. ${hole} does not provide it — no face card, no suit potential, no connected value.`,
+      ],
+      BTN:[
+        `${hole} from the BTN: usually a fold because even though the button opens very wide, ${hole} has low card values and no suited potential. The button opens hands that have some equity when called. This does not have much.`,
+        `Folded ${hole} from the button. The button opens ${edge}, but there is a floor. ${hole} sits below it — no high cards, no pair potential, and likely offsuit. Good fold.`,
+        `${hole} from BTN is below the opening floor. Even from the best seat you need some raw material: a face card, a pair, suited cards, or connected cards. This has none of that.`,
+        `Button fold with ${hole}. The BTN opens 40 percent or more, but the bottom of that range still has equity. Two cards below seven, both offsuit, give you nothing to work with even in position.`,
+        `Folded ${hole} from the button. Even though BTN is the best seat, ${hole} has no high-card strength, no drawing potential, and would miss most flops. Fold it, steal with something better next orbit.`,
+        `${hole} from BTN: fold. The button opens wide, but not infinitely wide. Two random low cards with no suit or connection give away position without gaining anything. Wait for a better hand to steal with.`,
+      ],
+      SB:[
+        `${hole} from the SB: fold is right. When it folds to you the SB can steal wide, but ${hole} does not have enough to justify putting chips in only to play out of position. The range here is ${edge}.`,
+        `Folded ${hole} from the small blind. Good. You would play every postflop street first to act if called, and ${hole} does not flop well enough to handle that.`,
+        `${hole} from the SB: correct fold. The SB is the worst postflop seat. Even though you can steal wide when folded to you, ${hole} has no upside if called. You would be playing the whole hand blind and out of position.`,
+        `Folded ${hole} from SB. Smart. Raising from the SB puts you in position preflop but out of position on every postflop street. Only raise hands that play well without positional advantage. ${hole} is not one of them.`,
+        `SB fold with ${hole}: right decision. The SB is the toughest seat to play postflop. You act first on every street after the flop. ${hole} gives you no tools to navigate that spot against anyone who calls.`,
+      ],
+      BB:[
+        `${hole} in the BB facing a raise: fold. The BB gets a discount but not a free pass. ${hole} is too weak to call profitably, especially out of position for the whole hand.`,
+        `Folded ${hole} from the BB. Correct. You defend the BB with ${edge}, but this hand is too weak to call a raise with. You would miss too many flops and have no strong draw potential.`,
+        `BB fold with ${hole}: right call. The BB defend range is wide but has a floor. ${suited?'The suited aspect gives you a slight boost':'Nothing about this hand'} makes it worth calling a raise and playing the whole hand out of position.`,
+        `${hole} in the BB: folding to a raise here is correct. The price is attractive since you already have chips in, but ${hole} has poor high-card strength and${suited?' while suited,':''} does not connect well with most boards.`,
+        `Good BB fold with ${hole}. The BB defend range includes pairs, suited hands, and connected cards. ${hole} does not fit any of those categories well enough to justify calling a raise from out of position.`,
+        `${hole} in the BB: the discount only goes so far. Calling a raise with a hand that misses most flops and has no draw potential costs more in postflop losses than you save on the preflop price.`,
+      ],
+    };
+    const pool = junkMsgs[pos] || [`${hole} from ${pos}: routine fold. The ${pos} opening range is ${edge}. This hand does not reach that threshold. Folding quickly is correct.`];
+    return {key:'preFold', p:5, t:pool[Math.floor(rand()*pool.length)]};
+  }
+
+  // ---- HAND WAS PLAYED: find biggest money decision ----
+  const a = A.reduce((m,x)=> (Math.max(x.toCall,x.amt,x.to) > Math.max(m.toCall,m.amt,m.to) ? x : m), A[0]);
+  const stName = a.street==='pre'?'preflop':a.street;
+
+  if(a.street!=='pre'){
+    const bp = BUCKET_PHRASE[a.bucket]||'your hand';
+    const drawTxt = a.draws&&a.draws.length?` plus a ${a.draws[0]}`:'';
+    const opp = a.vs||'your opponent';
+    const vt = a.vsType||'';
+    const oppDesc = vt==='station'?`${opp} is a calling station who rarely folds`
+      : vt==='nit'?`${opp} is a nit who only bets strong hands`
+      : vt==='tag'?`${opp} is a TAG whose bets are usually value`
+      : vt==='lag'?`${opp} is a LAG who fires often with air`
+      : vt==='maniac'?`${opp} bets almost anything`
+      : '';
+
+    if(a.act==='call'){
+      const need = needPct(a.toCall,a.pot);
+      return {key:'reviewCall', p:5, t: pick([
+        `Key decision: ${stName} on ${boardP}. You called ${fmtC(a.toCall)} into ${fmtC(a.pot)} with ${bp}${drawTxt}. You needed about ${need}% equity. ${oppDesc?oppDesc+'.':''} Before every call ask: what worse hands does ${opp} have here that I beat? If you can name several, the call makes sense. If you cannot, it is a fold.`,
+        `${stName.charAt(0).toUpperCase()+stName.slice(1)} call check: ${fmtC(a.toCall)} into ${fmtC(a.pot)} with ${bp}${drawTxt}. Break-even equity: ${need}%. ${vt==='lag'||vt==='maniac'?`${opp} bets with a wide range so your equity is probably fine.`:`Think about ${opp}'s range. Are you ahead of most of it?`}`,
+        `You called ${fmtC(a.toCall)} on the ${stName} (${boardP}) with ${bp}${drawTxt}. That is ${need}% of the pot as a price. ${oppDesc?oppDesc+', which changes what hands they have here.':''} Rule: name two hands worse than yours that ${opp} bets here. If you can, call. If you cannot, fold.`,
+        `${stName.charAt(0).toUpperCase()+stName.slice(1)}, ${boardP}: calling ${fmtC(a.toCall)} into ${fmtC(a.pot)} with ${bp}${drawTxt}. You needed ${need}% equity. ${oppDesc?oppDesc+'.':''} The question is always: what in their range do you beat? Not "could they be bluffing" — what specific worse hands would they bet here?`,
+        `Call on the ${stName} with ${bp}${drawTxt} (${boardP}). Price: ${need}% equity needed. ${vt==='nit'?`${opp} is a nit. Big bets from tight players are almost never bluffs.`:vt==='maniac'?`${opp} bets a wide range here, so calling is probably justified.`:oppDesc?oppDesc+'.':''} Evaluate every call with a number, not a feeling.`,
+        `${fmtC(a.toCall)} call with ${bp}${drawTxt} on the ${stName} (${boardP}). That costs you ${need}% equity to break even. ${oppDesc?oppDesc+'.':''} When the math is close, let your read on the player decide. When the math is clearly against you, fold.`,
+        `Calling ${fmtC(a.toCall)} on the ${stName}: break-even is ${need}% equity. With ${bp}${drawTxt} on ${boardP}, how much of ${opp||"your opponent"}'s range do you beat? More than ${need}%? Then the call is right. Less? Then it is wrong.`,
+      ])};
+    }
+
+    if(a.act==='bet'||a.act==='raise'){
+      const frac = a.pot>0 ? a.amt/a.pot : 0;
+      if((a.bucket==='strong'||a.bucket==='monster') && frac>0 && frac<0.45){
+        return {key:'reviewSizeUp', p:5, t: pick([
+          `${stName.charAt(0).toUpperCase()+stName.slice(1)}, board ${boardP}: your bet of ${fmtC(a.amt)} into ${fmtC(a.pot)} with ${bp} was undersized. When you have a strong hand you want to build the pot, not protect it. Betting around ${fmtC(Math.round(a.pot*0.7))} charges draws and grows the stack you can win.`,
+          `You bet ${fmtC(a.amt)} into ${fmtC(a.pot)} on the ${stName} with ${bp}. That is only ${Math.round(frac*100)}% of the pot. With a strong hand, bet bigger: around 60 to 75%. Smaller bets give draws a cheap price and you miss value from calling hands.`,
+          `${stName.charAt(0).toUpperCase()+stName.slice(1)}, ${boardP}: ${bp} and you bet only ${fmtC(a.amt)} into ${fmtC(a.pot)}. Small bets with big hands are a common sizing error. Bet ${fmtC(Math.round(a.pot*0.65))} to ${fmtC(Math.round(a.pot*0.75))} and charge your customers the right amount.`,
+          `Undersized bet on the ${stName} with ${bp} (${boardP}). ${fmtC(a.amt)} into ${fmtC(a.pot)} is ${Math.round(frac*100)}% of the pot. You want to be around 60 to 70% with a strong hand to build the pot and deny cheap equity to draws.`,
+          `${bp} on the ${stName} (${boardP}) and you bet ${Math.round(frac*100)}% of the pot. Strong hands need strong sizing. A bet of ${fmtC(Math.round(a.pot*0.7))} gets more value from the hands that call and gives draws less reason to stick around.`,
+        ])};
+      }
+      return {key:'reviewBet', p:5, t: pick([
+        `${stName.charAt(0).toUpperCase()+stName.slice(1)}, board ${boardP}: you bet ${fmtC(a.amt||a.to)} with ${bp}${drawTxt}. Taking the initiative is usually right. ${vt==='station'||vt==='maniac'?`${opp} calls everything, so bluffs here are expensive. Bet for value, not fold equity.`:`Pressure works on tighter players like ${opp}.`}`,
+        `You ${a.act==='raise'?'raised':'bet'} ${fmtC(a.amt||a.to)} on the ${stName} with ${bp}${drawTxt} on ${boardP}. Aggression with a made hand or draw is correct. ${drawTxt?'If the draw does not come in next street, decide: barrel or give up?':'Think about which turn cards help you and which hurt.'}`,
+        `Bet ${fmtC(a.amt||a.to)} on the ${stName} with ${bp}${drawTxt} (${boardP}). Good — taking the initiative forces decisions. ${oppDesc?oppDesc+', so adjust your plan if they call or raise.':'Betting is usually the right default with a hand or a draw.'}`,
+        `${stName.charAt(0).toUpperCase()+stName.slice(1)} aggression with ${bp}${drawTxt} on ${boardP}: ${fmtC(a.amt||a.to)} bet. Betting here wins two ways: ${opp||'opponents'} fold, or they call with worse. ${drawTxt?'If the draw misses, think about whether a second barrel makes sense.':'Keep asking what your opponent has and whether your bet gets value or fold equity.'}`,
+        `You applied pressure on the ${stName} with ${bp}${drawTxt} (${boardP}). ${vt==='station'?`Against ${opp} who calls everything, focus on value bets not bluffs.`:vt==='lag'||vt==='maniac'?`Against ${opp} who plays back often, be prepared for a raise.`:'Good spot to bet. Define what your plan is on the next street before you act.'} Aggression with a purpose is better than aggression by reflex.`,
+        `${bp}${drawTxt} and you bet ${fmtC(a.amt||a.to)} on the ${stName} (${boardP}). This is the correct instinct. Passive players wait for action to come to them and miss value. Aggressive players create it. ${drawTxt?'Know what cards on the next street change your plan.':''}`,
+      ])};
+    }
+
+    if(a.act==='fold'){
+      const need = needPct(a.toCall,a.pot);
+      const tight = (a.bucket==='medium'||a.bucket==='strong');
+      return {key:'reviewFold', p:5, t: tight ? pick([
+        `Key decision: you folded ${bp} on the ${stName} (${boardP}) to a bet of ${fmtC(a.toCall)} into ${fmtC(a.pot)}. You only needed ${need}% equity to call. With a made hand that fold is likely too tight. ${oppDesc?oppDesc+', which means some of those bets are bluffs or weaker hands.':''}`,
+        `Folded ${bp} on the ${stName} (${boardP}). The price was ${need}% equity needed, and a ${a.bucket} hand typically has more than that. ${vt==='lag'||vt==='maniac'?`${opp} fires wide, so folding made hands to them costs money over time.`:'Consider whether you are folding too much to aggression in general.'}`,
+        `${bp} on the ${stName} (${boardP}) and you folded to ${fmtC(a.toCall)} into ${fmtC(a.pot)}. That only needed ${need}% equity. A ${a.bucket} hand is usually ahead of enough of ${opp||"their"} range to call. Are you over-folding to aggression?`,
+        `Folded ${bp} to a ${fmtC(a.toCall)} bet on the ${stName} (${boardP}). Break-even equity was ${need}%. ${a.bucket} hands generally clear that threshold. ${vt==='lag'||vt==='maniac'?`Against ${opp} who bets wide, giving up made hands is especially costly.`:'Think about whether that fold was based on logic or discomfort.'}`,
+        `Gave up ${bp} on the ${stName} (${boardP}) for ${fmtC(a.toCall)} into ${fmtC(a.pot)}. That price required only ${need}% equity. Medium-to-strong hands usually have more than that. If you are folding made hands to pressure regularly, you are being exploited.`,
+      ]) : pick([
+        `Folded ${bp} on the ${stName} (${boardP}) to ${fmtC(a.toCall)} into ${fmtC(a.pot)}. With ${bp}, letting it go is correct. ${oppDesc?oppDesc+'.':''} Saving chips when you have no equity is just as important as winning pots when you do.`,
+        `Good fold on the ${stName} with ${bp} (${boardP}). You needed ${need}% equity and ${bp} rarely has that facing a real bet. ${vt==='nit'||vt==='tag'?`${opp} only bets with strong hands, making this fold even more correct.`:''}`,
+        `Correct fold with ${bp} on the ${stName} (${boardP}). ${fmtC(a.toCall)} into ${fmtC(a.pot)} needed ${need}% equity. ${bp} simply does not have it. Getting out early when you have no equity is how you preserve your stack for better spots.`,
+        `${bp} on the ${stName} (${boardP}): fold is exactly right. Without equity or a realistic bluff-catching range, calling is just donating chips. ${oppDesc?oppDesc+'.':''} There will be better spots — wait for them.`,
+        `Folded ${bp} to pressure on the ${stName} (${boardP}). Good discipline. ${need}% equity required; ${bp} has far less. ${vt==='nit'?`And ${opp} is a nit — they do not bet big without a real hand.`:vt==='station'?`Even against ${opp} who bets wide, ${bp} has no realistic winning path here.`:''} Save the chips.`,
+      ])};
+    }
+  }
+
+  // Preflop: raised and took it down
+  if(H.flags.pfr && !H.flags.sawFlop){
+    return {key:'reviewSteal', p:5, t: pick([
+      `Your ${hole} raise from ${H.pos} took it down preflop. That is a profitable result: you risked ${fmtC(H.bb*3)} and picked up ${fmtC(H.bb*1.5)} in blinds without a showdown. Three successful steals like this pay for one full orbit.`,
+      `Raised ${hole} from ${H.pos} and everyone folded. Good result. This is exactly what late position raises are for: picking up uncontested chips. The hand strength matters less than position and fold equity.`,
+      `${hole} from ${H.pos} took the pot preflop. Small uncontested wins are the foundation of a positive win rate. They happen quietly, add up fast, and require zero postflop risk.`,
+      `Everyone folded to your ${hole} raise from ${H.pos}. Preflop aggression collected the pot without a flop. That is the cleanest possible outcome — you risked the minimum and took the maximum.`,
+      `Stole the blinds with ${hole} from ${H.pos}. Collecting uncontested preflop pots is pure profit. Do it consistently in late position and you offset significant stretches without a real hand.`,
+      `${hole} from ${H.pos} ran everyone out preflop. Raises that take down the blinds are underappreciated. Over a session they add up to a full buy-in of profit that does not require hitting a single flop.`,
+    ])};
+  }
+
+  // Fallback: generic but varied
+  return {key:'reviewGeneric', p:6, t: pick([
+    `Played ${hole} from ${H.pos} for ${H.result}. Go back through the hand in History and identify the one decision you are least sure about. Then ask: what does my opponent have here, and does my action make money against that range?`,
+    `${hole} from ${H.pos}: ${H.result}. The habit to build is thinking in ranges, not hands. Not "does he have a flush?" but "what percentage of the hands he plays this way is a flush, and what percentage is worse?" That question makes every decision clearer.`,
+    `Result with ${hole} from ${H.pos}: ${H.result}. Review it in History. The key question at every street is: am I betting for value (worse hands call), bluffing (better hands fold), or just guessing? If the answer is guessing, you found the leak.`,
+    `${hole} from ${H.pos} for ${H.result}. After every hand, pick one decision and stress-test it. What was the most expensive mistake or the best play? Naming it specifically is how the game gets clearer.`,
+    `${H.result} with ${hole} from ${H.pos}. When reviewing a hand, start from the end and work backward. Was the final action justified? If yes, go to the street before. Keep going until you find the one decision that changed the outcome.`,
+    `${hole} from ${H.pos}: ${H.result}. Think about the biggest pot decision in this hand. Was it based on math, a read, or just instinct? Math and reads are fine. Pure instinct without backing is a leak to track.`,
+    `Played ${hole} from ${H.pos} (${H.result}). Consider what information you had at each decision point. Poker skill is using available information efficiently. If you made a big call or fold, what told you to do it?`,
+  ])};
+}
+
+/* ---------- pattern coaching (50+ hands) ---------- */
+function patternLeaks(){
+  const d = derive(DATA.life);
+  const L = [];
+  const chk = (val, lo, hi, lowMsg, highMsg, label) => {
+    if(val===null) return;
+    if(val<lo) L.push({sev: val<lo*0.7?'high':'med', label, t:lowMsg});
+    else if(val>hi) L.push({sev: val>hi*1.35?'high':'med', label, t:highMsg});
+  };
+  chk(d.vpip, ...BENCH.vpip,
+    `<b>Too tight preflop.</b> VPIP ${d.vpip&&d.vpip.toFixed(1)}% (target 20 to 28). You are folding playable hands, especially in late position. Widen up on the button and cutoff.`,
+    `<b>Playing too many hands.</b> VPIP ${d.vpip&&d.vpip.toFixed(1)}% (target 20 to 28). Loose preflop means weak ranges postflop. Tighten your opens, especially early.`, 'VPIP');
+  chk(d.gap, ...BENCH.gap,
+    `<b>Almost never calling.</b> Gap ${d.gap&&d.gap.toFixed(1)} (target 3 to 7). Fine if intentional, but some hands play best as calls in position.`,
+    `<b>Calling too much, raising too little.</b> VPIP/PFR gap ${d.gap&&d.gap.toFixed(1)} (target 3 to 7). The classic passive leak. When a hand is worth playing, it is usually worth raising.`, 'VPIP/PFR GAP');
+  chk(d.tb, ...BENCH.tb,
+    `<b>3-betting too rarely.</b> ${d.tb&&d.tb.toFixed(1)}% (target 5 to 10). Opponents can open freely against you. Add 3-bets with your strongest hands plus some suited aces.`,
+    `<b>3-betting very wide.</b> ${d.tb&&d.tb.toFixed(1)}% (target 5 to 10). Works against tight players, but bar-game callers will make you show up with it.`, '3-BET');
+  chk(d.af, ...BENCH.af,
+    `<b>Too passive postflop.</b> Aggression factor ${d.af&&d.af.toFixed(1)} (target about 2 to 4). You call far more than you bet or raise. Passive players only win at showdown; aggressive players win both ways.`,
+    `<b>Hyper-aggressive postflop.</b> AF ${d.af&&d.af.toFixed(1)} (target about 2 to 4). Constant barreling gets picked off by calling stations. Slow down on rivers without value.`, 'AGGRESSION');
+  chk(d.foldCbet, ...BENCH.foldCbet,
+    `<b>Too sticky vs c-bets.</b> Folding ${d.foldCbet&&d.foldCbet.toFixed(0)}% (target 35 to 60). You are peeling flops with hands that cannot win. Missed flop, no draw, no plan: fold.`,
+    `<b>Over-folding to c-bets.</b> Folding ${d.foldCbet&&d.foldCbet.toFixed(0)}% (target 35 to 60). Aggressive players print money c-betting you with anything. Defend pairs and decent draws more.`, 'VS C-BET');
+  chk(d.wtsd, ...BENCH.wtsd,
+    `<b>Giving up too often.</b> WTSD ${d.wtsd&&d.wtsd.toFixed(0)}% (target 22 to 30). You see flops then surrender. Either tighten preflop or fight harder after the flop.`,
+    `<b>Going to showdown too much.</b> WTSD ${d.wtsd&&d.wtsd.toFixed(0)}% (target 22 to 30). Calling down light bleeds chips against value-heavy bettors.`, 'SHOWDOWN');
+  if(d.bb100!==null && DATA.life.hands>=100){
+    L.push({sev: d.bb100>=0?'good':'med', label:'WIN RATE',
+      t:`<b>${d.bb100>=0?'+':''}${d.bb100.toFixed(1)} bb/100</b> over ${DATA.life.hands} hands. ${d.bb100>=0?'Beating the table so far. Keep the sample growing.':'Negative so far. Pick one leak above and fix it before worrying about the rest.'}`});
+  }
+  if(!L.length) L.push({sev:'good', label:'SOLID', t:`<b>No major statistical leaks.</b> Your core numbers sit inside winning ranges. The next layer is bet sizing, hand reading, and exploiting specific player types: tap any opponent's seat to review their profile.`});
+  return L;
+}
+
+/* ---------- render ---------- */
+function renderAll(){ renderTicker(); renderMode(); renderSeats(); renderCenter(); renderMe(); }
+
+function renderTicker(){
+  const d = derive(DATA.life);
+  const f = (v)=> v===null?'·':v.toFixed(1);
+  const bbCls = d.bb100===null?'':(d.bb100>=0?'pos':'neg');
+  const saveTxt = saveState==='ok' ? '<b class="pos">saved</b>' : '<b class="warn">error</b>';
+  document.getElementById('ticker').innerHTML =
+    `<span>VPIP<b>${f(d.vpip)}</b></span>`+
+    `<span>PFR<b>${f(d.pfr)}</b></span>`+
+    `<span>AF<b>${d.af===null?'·':d.af.toFixed(1)}</b></span>`+
+    `<span>BB/100<b class="${bbCls}">${d.bb100===null?'·':(d.bb100>=0?'+':'')+d.bb100.toFixed(1)}</b></span>`+
+    `<span>HANDS<b>${DATA.life.hands}</b></span>`+
+    `<span>SAVE${saveTxt}</span>`;
+}
+function renderMode(){
+  const el = document.getElementById('modeinfo');
+  if(S.mode==='cash'){
+    el.innerHTML = `blinds <b>${fmtC(S.sb)} / ${fmtC(S.bb)}</b> · stacks ${fmtC(S.startStack)} · <b>${S.numPlayers}</b> players`;
+  } else {
+    const next = S.handsPerLevel - S.handsAtLevel;
+    el.innerHTML = `level <b>${S.level+1}</b> · blinds <b>${S.sb}/${S.bb}</b> · up in ${next} · <b>${S.numPlayers}</b> players`;
+  }
+  document.getElementById('mode-cash').classList.toggle('on', S.mode==='cash');
+  document.getElementById('mode-tourney').classList.toggle('on', S.mode==='tourney');
+  const me = S.players[0];
+  document.getElementById('rebuyBtn').style.display =
+    (S.mode==='cash' && me.stack < S.startStack && !S.handActive) ? '' : 'none';
+  const eqBtn = document.getElementById('eqToggle');
+  eqBtn.textContent = 'Win %: ' + (DATA.settings.showEquity?'on':'off');
+  eqBtn.classList.toggle('active', !!DATA.settings.showEquity);
+}
+function cardHTML(c, cls){
+  const red = (c.s==='h'||c.s==='d') ? ' red':'';
+  return `<span class="card${red} ${cls||''}">${RANKCH[c.r]}${SUITCH[c.s]}</span>`;
+}
+function renderSeats(){
+  const n = S.players.length - 1; // AI count
+  // For 7+ seats use 4-column grid so it wraps into two rows naturally
+  const cols = n <= 3 ? n : n <= 6 ? Math.min(n,5) : 4;
+  document.getElementById('seats').style.gridTemplateColumns = `repeat(${cols},minmax(0,1fr))`;
+  const html = S.players.slice(1).map(p=>{
+    const acting = S.acting===p.id ? ' acting':'';
+    const folded = p.folded&&!p.out ? ' folded':'';
+    const out = (p.out && !p.revealed) ? ' out':'';
+    const isBtn = S.btn===p.id;
+    let cards = '';
+    if(!p.folded && p.hole.length && (p.revealed || !p.out)){
+      cards = p.revealed
+        ? `<span class="cards">${cardHTML(p.hole[0],'sm')}${cardHTML(p.hole[1],'sm')}</span>`
+        : `<span class="cards"><span class="card sm back"></span><span class="card sm back"></span></span>`;
+    }
+    const won = S.lastWin.includes(p.id);
+    const actCls = p.lastAct==='fold' ? 'act-fold' : (won?'act-win':'');
+    return `<button class="seat${acting}${folded}${out}" onclick="villainCard('${p.type}')" ${p.out?'disabled':''}>
+      ${isBtn?'<span class="dbtn">D</span>':''}
+      <div class="nm"><b>${p.name}</b><span class="tag">${PROF[p.type].label}</span></div>
+      <div class="row2">${cards||'<span></span>'}<span class="stk">${p.out?'OUT':fmtC(p.stack)}</span></div>
+      <div class="bet ${actCls}">${p.out?'':(p.lastAct||(p.streetPut>0?fmtC(p.streetPut):''))}</div>
+      ${p.revealed&&p.sdName?`<div class="hand-name">${p.sdName}</div>`:''}
+    </button>`;
+  }).join('');
+  document.getElementById('seats').innerHTML = html;
+}
+function renderCenter(){
+  document.getElementById('potline').innerHTML = `Pot <b>${fmtC(potTotal())}</b>`;
+  let bh = S.board.map(c=>cardHTML(c,'lg')).join('');
+  for(let i=S.board.length;i<5;i++) bh += '<span class="slot"></span>';
+  document.getElementById('board').innerHTML = bh;
+}
+function renderLog(){
+  const el = document.getElementById('log');
+  el.innerHTML = S.logLines.slice(-12).map(l=>`<div class="${l.hl?'hl':''}">${l.line}</div>`).join('');
+  el.scrollTop = el.scrollHeight;
+}
+function renderMe(){
+  const me = S.players[0];
+  const pos = me.out?'OUT':positionOf(me);
+  document.getElementById('mepos').textContent = pos;
+  document.getElementById('mestk').innerHTML = `stack <b>${fmtC(me.stack)}</b>${me.streetPut>0?` · in ${fmtC(me.streetPut)}`:''}`;
+  const mc = document.getElementById('mecards');
+  if(me.hole.length && !me.out){
+    mc.innerHTML = cardHTML(me.hole[0],'lg')+cardHTML(me.hole[1],'lg');
+    mc.style.opacity = me.folded ? .35 : 1;
+  } else mc.innerHTML = '';
+  const tc = document.getElementById('metocall');
+  if(S.acting===0){
+    const toCall = S.currentBet - me.streetPut;
+    tc.textContent = toCall>0 ? `${fmtC(toCall)} to call` : '';
+  } else tc.textContent='';
+  if(!DATA.settings.showEquity || S.acting!==0){
+    document.getElementById('eqbadge').style.display='none';
+  }
+  const hint = document.getElementById('poshint');
+  hint.textContent = (S.handActive && !me.out && POSINFO[pos]) ? POSINFO[pos].hint : '';
+  if(S.acting!==0 && !userResolve){
+    const bar = document.getElementById('actbar');
+    if(!S.handActive && !S.finished){
+      const canDeal = !(S.mode==='cash' && me.stack<=0);
+      bar.innerHTML = `<button class="abtn primary" onclick="startHand()" ${canDeal?'':'disabled'}>Deal next hand</button>`+
+        (canDeal?'':'<span class="tocall" style="align-self:center">Rebuy to keep playing</span>');
+    } else if(S.handActive){
+      bar.innerHTML = '';
+    }
+  }
+}
+function renderActions(p, toCall){
+  const pot = potTotal();
+  const bar = document.getElementById('actbar');
+  let html = '';
+  if(toCall>0) html += `<button class="abtn fold" onclick='uact({act:"fold"})'>Fold</button>`;
+  if(toCall<=0) html += `<button class="abtn call" onclick='uact({act:"check"})'>Check</button>`;
+  else html += `<button class="abtn call" onclick='uact({act:"call"})'>Call ${fmtC(Math.min(toCall,p.stack))}</button>`;
+
+  const maxTo = p.streetPut + p.stack;
+  const chips = [];
+  const addChip = (label,to)=>{
+    to = Math.round(to);
+    const minTo = S.currentBet>0 ? legalMinRaiseTo() : S.bb;
+    if(to<minTo) to=minTo;
+    if(to>=maxTo) return;
+    if(chips.some(c=>c.to===to)) return;
+    chips.push({label,to});
+  };
+  if(S.street==='pre'){
+    if(S.preRaises===0){
+      addChip('3x', S.bb*3);
+      addChip('4x', S.bb*4);
+      addChip('5x', S.bb*5);
+    } else {
+      addChip('3x', S.currentBet*3);
+      addChip('4.5x', S.currentBet*4.5);
+    }
+  } else {
+    if(S.currentBet===0){
+      addChip('\u2153', pot/3);
+      addChip('\u00BD', pot/2);
+      addChip('\u00BE', pot*0.75);
+      addChip('pot', pot);
+    } else {
+      addChip('2.5x', S.currentBet*2.5);
+      addChip('3.5x', S.currentBet*3.5);
+    }
+  }
+  let sz = `<span class="sizes"><span class="lbl">${S.currentBet>0?'raise to':'bet'}</span>`;
+  chips.forEach(c=>{
+    sz += `<button class="chip" onclick='uact({act:"raise",to:${c.to}})'>${c.label} ${fmtC(c.to)}</button>`;
+  });
+  sz += `<button class="chip" onclick='uact({act:"raise",to:${maxTo}})'>all-in ${fmtC(maxTo)}</button>`;
+  const minTo = S.currentBet>0 ? legalMinRaiseTo() : S.bb;
+  sz += `<input class="betin" id="betin" inputmode="numeric" placeholder="custom" onkeydown="if(event.key==='Enter')customBet(${minTo},${maxTo})">`;
+  sz += `<button class="chip" onclick="customBet(${minTo},${maxTo})">Go</button></span>`;
+  bar.innerHTML = html + sz;
+}
+
+/* ---------- coach panel ---------- */
+function showCoach(){
+  const el = document.getElementById('coachpanel');
+  if(!H || (S.players[0].out && S.finished)){ el.style.display='none'; return; }
+  const resCls = H.netC>0?'pos':H.netC<0?'neg':'';
+  const resultLabel = H.netC>0 ? `You won ${fmtC(H.netC)} chips` : H.netC<0 ? `You lost ${fmtC(Math.abs(H.netC))} chips` : 'Broke even';
+  let inner = `<div class="eyebrow">Post-hand review · ${H.pos} · ${prettyIds(H.hole)}</div>`;
+  inner += `<div class="res ${resCls}">${resultLabel}</div>`;
+  inner += H.notes.map(n=>`<p>${n}</p>`).join('');
+
+  // Explain any terms used
+  const terms = [];
+  const noteText = H.notes.join(' ').toLowerCase();
+  if(noteText.includes('c-bet')||noteText.includes('continuation bet')) terms.push('<b>C-bet (continuation bet):</b> a follow-up bet on the flop after you raised preflop, representing a strong hand.');
+  if(noteText.includes('fold equity')) terms.push('<b>Fold equity:</b> the extra value you get from a bet when there is a chance your opponent folds and you win without a showdown.');
+  if(noteText.includes('pot odds')) terms.push('<b>Pot odds:</b> the ratio of what you must call to what is in the pot. If the pot is 100 and you call 25, you are getting 4-to-1 odds.');
+  if(noteText.includes('vpip')) terms.push('<b>VPIP:</b> the percentage of hands where you voluntarily put chips in preflop. A measure of how loose or tight you play.');
+  if(noteText.includes('3-bet')) terms.push('<b>3-bet:</b> re-raising someone who already raised. First bet = blind, second bet = open raise, third bet = 3-bet.');
+  if(noteText.includes('outs')) terms.push('<b>Outs:</b> the number of cards left in the deck that would complete your drawing hand.');
+  if(noteText.includes('equity')) terms.push('<b>Equity:</b> your percentage chance of winning the hand if all the cards were dealt out right now.');
+  if(noteText.includes('range')) terms.push('<b>Range:</b> the full set of hands an opponent might have in a given situation, not just one specific hand.');
+  if(terms.length){
+    inner += `<div style="margin-top:10px;padding-top:9px;border-top:1px solid var(--line);font-size:10px;color:var(--dim);line-height:1.7">${terms.join('<br>')}</div>`;
+  }
+
+  el.innerHTML = inner;
+  el.style.display = '';
+}
+function hideCoach(){ document.getElementById('coachpanel').style.display='none'; }
+
+/* ---------- session ---------- */
+function endSession(){
+  const d = derive(SESSION);
+  if(d.hands===0){ showModal('Session', '<p>No hands played this session yet.</p>', [{label:'Close', cb:closeModal}]); return; }
+  const l = derive(DATA.life);
+  const f = v=>v===null?'·':v.toFixed(1);
+  const leak = topSessionLeak(d);
+  showModal('Session summary',
+    `<p><b>${d.hands}</b> hands · net <b>${SESSION.netBB>=0?'+':''}${SESSION.netBB.toFixed(1)} big blinds</b> (${d.bb100>=0?'+':''}${f(d.bb100)} bb/100)</p>
+     <p>VPIP <b>${f(d.vpip)}</b> (life ${f(l.vpip)}) · PFR <b>${f(d.pfr)}</b> (life ${f(l.pfr)}) · AF <b>${d.af===null?'·':d.af.toFixed(1)}</b></p>
+     <p>${leak}</p>`,
+    [{label:'Start new session', cb:()=>{ SESSION=blankStats(); closeModal(); renderStatsView(); }},
+     {label:'Keep playing', cb:closeModal}]);
+}
+function topSessionLeak(d){
+  if(d.hands<15) return 'Small sample this session. Stat reads need more hands.';
+  if(d.gap!==null && d.gap>8) return `<b>Session leak:</b> VPIP/PFR gap of ${d.gap.toFixed(1)}. You called too much preflop today. Raise or fold.`;
+  if(d.af!==null && d.af<1.5) return `<b>Session leak:</b> AF ${d.af.toFixed(1)}. Very passive postflop today.`;
+  if(d.vpip!==null && d.vpip>32) return `<b>Session leak:</b> VPIP ${d.vpip.toFixed(1)}%. Loose day at the office.`;
+  return 'No glaring session leak. Solid work.';
+}
+
+/* ---------- stats view ---------- */
+let scope = 'life';
+function setScope(s){
+  scope = s;
+  document.getElementById('scope-life').classList.toggle('on', s==='life');
+  document.getElementById('scope-sess').classList.toggle('on', s==='sess');
+  renderStatsView();
+}
+function statusDot(val, lo, hi){
+  if(val===null) return '<span class="sdot na"></span>';
+  return (val>=lo&&val<=hi) ? '<span class="sdot ok"></span>' : '<span class="sdot off"></span>';
+}
+function renderStatsView(){
+  const src = scope==='life' ? DATA.life : SESSION;
+  const d = derive(src);
+  document.getElementById('statsub').innerHTML = `<b>${d.hands}</b> hands ${scope==='life'?'lifetime':'this session'}`;
+  const f = (v,dec)=>v===null?'·':v.toFixed(dec===undefined?1:dec);
+  const cards = [
+    {lab:'VPIP %', v:f(d.vpip), b:'target 20 to 28', dot:statusDot(d.vpip,...BENCH.vpip), desc:'How often you voluntarily put chips in preflop. Looseness.'},
+    {lab:'PFR %', v:f(d.pfr), b:'target 16 to 24', dot:statusDot(d.pfr,...BENCH.pfr), desc:'How often you raise preflop. Preflop aggression.'},
+    {lab:'VPIP/PFR gap', v:f(d.gap), b:'target 3 to 7', dot:statusDot(d.gap,...BENCH.gap), desc:'The best passivity read. Big gap = calling too much.'},
+    {lab:'3-bet %', v:f(d.tb), b:'target 5 to 10', dot:statusDot(d.tb,...BENCH.tb), desc:'How often you re-raise a preflop raise.'},
+    {lab:'Fold to 3-bet %', v:f(d.f3b,0), b:'target 45 to 65', dot:statusDot(d.f3b,...BENCH.f3b), desc:'When your raise gets re-raised, how often you give up.'},
+    {lab:'Aggression factor', v:d.af===null?'·':d.af.toFixed(1), b:'target 1.8 to 4', dot:statusDot(d.af,...BENCH.af), desc:'Postflop bets and raises divided by calls.'},
+    {lab:'Fold to c-bet %', v:f(d.foldCbet,0), b:'target 35 to 60', dot:statusDot(d.foldCbet,...BENCH.foldCbet), desc:'How often you fold the flop when the preflop raiser bets.'},
+    {lab:'WTSD %', v:f(d.wtsd,0), b:'target 22 to 30', dot:statusDot(d.wtsd,...BENCH.wtsd), desc:'Of flops seen, how often you reach showdown.'},
+    {lab:'Won at showdown %', v:f(d.wsd,0), b:'target 48 to 56', dot:statusDot(d.wsd,...BENCH.wsd), desc:'Low = calling down too light. Very high = not bluff-catching enough.'},
+    {lab:'bb / 100 hands', v:d.bb100===null?'·':(d.bb100>=0?'+':'')+d.bb100.toFixed(1), b:'the bottom line', dot:'<span class="sdot '+(d.bb100===null?'na':d.bb100>=0?'ok':'off')+'"></span>', desc:'Net win rate in big blinds per 100 hands.'}
+  ];
+  document.getElementById('statgrid').innerHTML = cards.map(c=>
+    `<div class="statcard"><div class="lab">${c.lab}${c.dot}</div><div class="val">${c.v}</div><div class="bench">${c.b}</div><div class="desc">${c.desc}</div></div>`).join('');
+
+  const lp = document.getElementById('leakpanel');
+  const n = DATA.life.hands;
+  if(n<50){
+    lp.innerHTML = `<h3>Pattern coaching <span class="cnt">locked</span></h3>
+      <div class="lockmsg">Unlocks at 50 lifetime hands. ${n}/50 so far. Stat reads on tiny samples are noise, not signal.</div>
+      <div class="lockbar"><i style="width:${n*2}%"></i></div>`;
+  } else {
+    const leaks = patternLeaks();
+    lp.innerHTML = `<h3>Pattern coaching <span class="cnt">${DATA.life.hands} hand sample</span></h3>` +
+      leaks.map(l=>`<div class="leak"><span class="sev ${l.sev}">${l.sev==='good'?'solid':l.sev}</span><span style="color:var(--dim);font-size:10px;letter-spacing:.08em">${l.label}</span><div style="margin-top:4px">${l.t}</div></div>`).join('');
+  }
+}
+function toggleEquity(){
+  DATA.settings.showEquity = !DATA.settings.showEquity;
+  saveData(); renderMode();
+  if(!DATA.settings.showEquity) document.getElementById('eqbadge').style.display='none';
+  else if(S.acting===0 && userResolve) updateEquity(S.players[0]);
+}
+function clearHistory(){
+  showModal('Clear hand history', '<p>This deletes all saved hand records but keeps your lifetime stats (VPIP, PFR, win rate, etc). Good for clearing out test hands.</p>',
+    [{label:'Clear it', cb:()=>{
+        DATA.hands = [];
+        saveData();
+        closeModal(); renderHistory();
+      }, danger:true},
+     {label:'Cancel', cb:closeModal}]);
+}
+function resetAll(){
+  showModal('Reset all data', '<p>This wipes lifetime stats and all hand history. No undo.</p>',
+    [{label:'Wipe it', cb:()=>{
+        DATA = {v:2, life:blankStats(), settings:{...DATA.settings}, hands:[]};
+        SESSION = blankStats();
+        try{ localStorage.setItem(DKEY, JSON.stringify(DATA)); }catch(e){}
+        closeModal(); renderAll(); renderStatsView(); renderHistory();
+      }, danger:true},
+     {label:'Cancel', cb:closeModal}]);
+}
+
+/* ---------- modals: positions & villains ---------- */
+function positionGuide(){
+  const me = S.players[0];
+  const cur = me.out ? '' : positionOf(me);
+  // Build ordered list from current table's live positions
+  const liveOrd = seatOrderFromBtn();
+  const allPos = liveOrd.map(p=>positionOf(p));
+  // Put current position first, then the rest in seat order
+  const sorted = cur && allPos.includes(cur)
+    ? [cur, ...allPos.filter(x=>x!==cur)]
+    : allPos;
+  const body = sorted.map(k=>{
+    const p = POSINFO[k];
+    if(!p) return '';
+    return `<div class="posblock${k===cur?' cur':''}">
+      <h4>${k}${k===cur?' · you are here':''}</h4>
+      <p>${p.s}</p><p>${p.w}</p><p><b>Range:</b> ${p.range}</p>
+    </div>`;
+  }).join('');
+  showModal('Positions', body, [{label:'Close', cb:closeModal}]);
+}
+function villainCard(type){
+  const v = VILLAIN_INFO[type];
+  if(!v) return;
+  const body = `<div class="vline"><b>${v.sub}</b></div>
+    <p>${v.desc}</p>
+    <p><b>How to exploit:</b></p>
+    <ul>${v.exploit.map(e=>`<li>${e}</li>`).join('')}</ul>
+    <p>${v.watch}</p>`;
+  showModal(v.title, body, [{label:'Close', cb:closeModal}]);
+}
+
+/* ---------- history view ---------- */
+let expanded = null;
+function renderHistory(){
+  const pos = document.getElementById('f-pos').value;
+  const flag = document.getElementById('f-flag').value;
+  const mode = document.getElementById('f-mode').value;
+  let rows = [...DATA.hands].reverse();
+  if(pos) rows = rows.filter(h=>h.pos===pos);
+  if(mode) rows = rows.filter(h=>h.mode===mode);
+  if(flag==='won') rows = rows.filter(h=>(h.netC??h.net)>0);
+  else if(flag==='lost') rows = rows.filter(h=>(h.netC??h.net)<0);
+  else if(flag==='noted') rows = rows.filter(h=>h.notes&&h.notes.length);
+  else if(flag) rows = rows.filter(h=>h.flags&&h.flags[flag]);
+
+  const el = document.getElementById('histlist');
+  if(!rows.length){ el.innerHTML = '<div class="empty">No hands match. Go play some.</div>'; return; }
+  el.innerHTML = rows.slice(0,80).map(h=>{
+    const dt = new Date(h.t);
+    const when = `${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    const netV = h.netC!==undefined ? h.netC : h.net;
+    const netCls = netV>0?'pos':netV<0?'neg':'';
+    const holeH = (h.hole||'').split(' ').filter(Boolean).map(cs=>{
+      const red = cs.endsWith('h')||cs.endsWith('d');
+      return `<span class="card sm${red?' red':''}">${cs[0]}${SUITCH[cs.slice(-1)]||''}</span>`;
+    }).join('');
+    const chips = [];
+    if(h.flags){ if(h.flags.threeBet)chips.push('3-bet'); if(h.flags.foldCbet)chips.push('fold v cbet'); if(h.flags.wtsd)chips.push('showdown'); }
+    if(h.notes&&h.notes.length)chips.push('note');
+    const isOpen = expanded===h.id;
+    let detail = '';
+    if(isOpen){
+      detail = `<div class="hdetail" onclick="event.stopPropagation()">
+        <div class="lines">${(h.log||[]).map(l=>`<div>${l}</div>`).join('')}</div>
+        ${h.notes&&h.notes.length?`<div class="notes">${h.notes.map(n=>`<div>${n}</div>`).join('')}</div>`:''}
+      </div>`;
+    }
+    return `<div class="hrowi">
+      <div class="hsum" onclick="toggleHand('${h.id}')">
+        <span class="when">${when} · ${h.mode==='tourney'?'TRN':'CASH'}</span>
+        <span class="hpos">${h.pos}</span>
+        <span class="cards">${holeH}</span>
+        ${chips.slice(0,2).map(c=>`<span class="flagchip">${c}</span>`).join('')}
+        <span class="net ${netCls}">${netV>0?'+':''}${fmtC(netV)}</span>
+      </div>${detail}
+    </div>`;
+  }).join('');
+}
+function toggleHand(id){
+  expanded = expanded===id ? null : id;
+  renderHistory();
+}
+
+
+/* ---------- views / modes ---------- */
+function showView(v){
+  ['table','stats','history'].forEach(x=>{
+    document.getElementById('view-'+x).style.display = x===v?'':'none';
+    document.getElementById('tab-'+x).classList.toggle('on', x===v);
+  });
+  if(v==='stats') renderStatsView();
+  if(v==='history') renderHistory();
+}
+function setMode(m){
+  if(S.mode===m) return;
+  if(S.handActive){
+    showModal('Switch mode', '<p>A hand is in progress. Switching now abandons it (the hand will not count).</p>',
+      [{label:'Switch anyway', cb:()=>{ if(userResolve){const r=userResolve;userResolve=null;r({act:'fold'});} openSetup(); closeModal(); }},
+       {label:'Cancel', cb:closeModal}]);
+    return;
+  }
+  openSetup();
+}
+function setModeForce(m, cfg){
+  dealing = false; userResolve = null;
+  S = freshState(m, cfg);
+  document.getElementById('mode-cash').classList.toggle('on', m==='cash');
+  document.getElementById('mode-tourney').classList.toggle('on', m==='tourney');
+  hideCoach();
+  renderAll();
+  document.getElementById('actbar').innerHTML = `<button class="abtn primary" onclick="startHand()">Deal first hand</button>`;
+  document.getElementById('log').innerHTML = `<div>${m==='tourney'
+    ?`Tournament: ${S.numPlayers} players, ${fmtC(S.startStack)} chips, blinds ${S.sb}/${S.bb}, up every ${S.handsPerLevel} hands.`
+    :`Cash game: ${fmtC(S.sb)}/${fmtC(S.bb)} blinds, ${fmtC(S.startStack)} stacks, ${S.numPlayers} players.`
+  }</div><div>Tap any opponent for their profile. Tap your position badge for the position guide.</div>`;
+}
+function rebuy(){
+  const me = S.players[0];
+  me.stack += S.startStack;
+  log('You rebuy. Stack '+fmtC(me.stack));
+  renderAll();
+}
+function endGameButtons(){
+  // Delay slightly so this wins over the renderAll at the end of endHand
+  setTimeout(()=>{
+    const bar = document.getElementById('actbar');
+    bar.innerHTML = `<button class="abtn primary" onclick="openSetup()">New game</button>
+      <button class="abtn" onclick="replaySetup()">Same setup again</button>`;
+  }, 60);
+}
+function replaySetup(){
+  const c = S.cfg0;
+  setModeForce(S.mode, c);
+  startHand();
+}
+
+/* ---------- setup screen ---------- */
+const SCHED_PRESETS = {
+  bar:    [[100,200],[150,300],[200,400],[300,600],[500,1000],[750,1500],[1000,2000]],
+  casino: [[25,50],[50,100],[75,150],[100,200],[150,300],[200,400],[300,600],[500,1000]],
+  turbo:  [[100,200],[200,400],[400,800],[800,1600],[1500,3000],[3000,6000]],
+};
+let selectedSched = 'bar';
+let oppMode = 'custom';   // custom | random | mixed
+let hintMode = 'question'; // off | question
+
+function setOppMode(m){
+  oppMode = m;
+  ['custom','random','mixed'].forEach(k=>{
+    const el = document.getElementById('opp-'+k);
+    if(el) el.classList.toggle('on', k===m);
+  });
+  const slots = document.getElementById('cfg-ai-slots');
+  const note = document.getElementById('opp-random-note');
+  if(m === 'custom'){
+    slots.style.display = '';
+    note.style.display = 'none';
+    buildAiSlots();
+  } else if(m === 'random'){
+    slots.style.display = 'none';
+    note.style.display = '';
+  } else { // mixed
+    slots.style.display = 'none';
+    note.style.display = '';
+    note.textContent = 'One of each type will be seated (station, TAG, LAG, nit, maniac) plus extras if needed.';
+  }
+}
+
+function setHintMode(m){
+  hintMode = m;
+  ['off','question'].forEach(k=>{
+    const el = document.getElementById('hint-'+k);
+    if(el) el.classList.toggle('on', k===m);
+  });
+}
+
+function pickSched(key){
+  selectedSched = key;
+  ['bar','casino','turbo','custom'].forEach(k=>{
+    const el = document.getElementById('sched-'+k);
+    if(el) el.classList.toggle('on', k===key);
+  });
+  if(key !== 'custom' && SCHED_PRESETS[key]){
+    const first = SCHED_PRESETS[key][0];
+    document.getElementById('cfg-sb').value = first[0];
+    document.getElementById('cfg-bb').value = first[1];
+  }
+}
+
+function updateSetupUI(){
+  const mode = document.getElementById('cfg-mode').value;
+  const isTourney = mode === 'tourney';
+  document.getElementById('cfg-tourney-section').style.display = isTourney ? '' : 'none';
+
+  if(!isTourney){
+    document.getElementById('cfg-sb').value = 1;
+    document.getElementById('cfg-bb').value = 3;
+    document.getElementById('cfg-stack').value = 300;
+  } else {
+    document.getElementById('cfg-stack').value = 3500;
+    pickSched('bar');
+  }
+  buildAiSlots();
+}
+
+function buildAiSlots(){
+  const nEl = document.getElementById('cfg-players');
+  if(!nEl) return;
+  const n = parseInt(nEl.value) - 1;
+  const types = ['station','tag','lag','nit','maniac'];
+  const defaults = AI_ROSTER.map(a=>a.type);
+  const names = AI_ROSTER.map(a=>a.name);
+  const extraNames = ['Alex','Blake','Casey','Dana','Evan','Fran','Glen','Hank'];
+  let html = '';
+  for(let i=0; i<n; i++){
+    const nm = names[i] || extraNames[i-names.length] || `P${i+2}`;
+    const def = defaults[i] || types[i % types.length];
+    html += `<div class="ai-slot">
+      <label>Seat ${i+2} · ${nm}</label>
+      <select id="ai-type-${i}">
+        ${types.map(t=>`<option value="${t}" ${t===def?'selected':''}>${t.toUpperCase()}</option>`).join('')}
+      </select>
+    </div>`;
+  }
+  document.getElementById('cfg-ai-slots').innerHTML = html;
+}
+
+function openSetup(){
+  buildAiSlots();
+  updateSetupUI();
+  document.getElementById('setupOverlay').style.display='flex';
+}
+
+function startFromSetup(){
+  const mode = document.getElementById('cfg-mode').value;
+  const numPlayers = parseInt(document.getElementById('cfg-players').value);
+  const startStack = Math.max(10, parseInt(document.getElementById('cfg-stack').value)||300);
+  const sbRaw = Math.max(1, parseInt(document.getElementById('cfg-sb').value)||1);
+  const bbRaw = Math.max(sbRaw+1, parseInt(document.getElementById('cfg-bb').value)||(sbRaw*2));
+  const handsPerLevel = parseInt(document.getElementById('cfg-handsPerLevel').value)||8;
+
+  let schedule;
+  if(selectedSched === 'custom'){
+    schedule = buildCustomSchedule(sbRaw, bbRaw);
+  } else {
+    schedule = SCHED_PRESETS[selectedSched] || SCHED_PRESETS.bar;
+  }
+
+  // Build AI roster based on opponent mode
+  const allTypes = ['station','tag','lag','nit','maniac'];
+  const aiRoster = [];
+  for(let i=0; i<numPlayers-1; i++){
+    const name = (AI_ROSTER[i]||{name:`P${i+2}`}).name;
+    let type;
+    if(oppMode === 'custom'){
+      const typeEl = document.getElementById('ai-type-'+i);
+      type = typeEl ? typeEl.value : AI_ROSTER[i%AI_ROSTER.length].type;
+    } else if(oppMode === 'mixed'){
+      type = allTypes[i % allTypes.length];
+    } else { // random
+      type = allTypes[Math.floor(rand()*allTypes.length)];
+    }
+    aiRoster.push({name, type});
+  }
+
+  DATA.settings.hintMode = hintMode;
+  saveData();
+
+  document.getElementById('setupOverlay').style.display='none';
+  setModeForce(mode, {numPlayers, startStack, sb:sbRaw, bb:bbRaw, schedule, handsPerLevel, aiRoster});
+  startHand();
+}
+
+function buildCustomSchedule(sb, bb){
+  const sched = [[sb, bb]];
+  let s=sb, b=bb;
+  for(let i=0;i<10;i++){
+    s = Math.round(s*1.5);
+    b = Math.round(b*1.5);
+    sched.push([s,b]);
+  }
+  return sched;
+}
+
+/* ---------- modal ---------- */
+function showModal(title, body, buttons){
+  const box = document.getElementById('modalbox');
+  box.innerHTML = `<h2>${title}</h2>${body}<div class="mrow">${
+    buttons.map((b,i)=>`<button class="abtn ${b.danger?'fold':i===0?'primary':''}" id="mbtn-${i}">${b.label}</button>`).join('')
+  }</div>`;
+  buttons.forEach((b,i)=>{ document.getElementById('mbtn-'+i).onclick = b.cb; });
+  document.getElementById('overlay').style.display='';
+}
+function closeModal(){ document.getElementById('overlay').style.display='none'; }
+
+/* ---------- boot ---------- */
+async function boot(){
+  S = freshState('cash');
+  loadData();
+  renderAll();
+  renderStatsView();
+  openSetup();
+}
+boot();
+</script>
+</body>
+</html>
