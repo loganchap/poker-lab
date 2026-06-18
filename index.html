@@ -83,18 +83,21 @@ nav button:hover{color:var(--ink)}
 .ghost:hover{color:var(--ink);border-color:var(--dim)}
 .ghost.active{color:var(--felt);border-color:var(--felt-dim)}
 
-.table-area{position:relative;padding:56px 96px;margin:4px 0 0}
+.game-layout{display:flex;align-items:flex-start;gap:20px;margin-top:4px}
+.table-area{position:relative;padding:50px 78px;flex:1;min-width:0;overflow:visible}
 .table{
   position:relative;
   border-radius:50%;
   aspect-ratio:18/10;
-  max-width:720px;
+  max-width:620px;
   margin:0 auto;
-  background:radial-gradient(ellipse 75% 60% at 50% 42%, #1b5c38 0%, #0f3d25 55%, #0a2c1b 100%);
-  border:10px solid #1c0f06;
-  box-shadow:0 0 0 4px #2a1709, 0 0 0 7px #0d0704, 0 28px 70px rgba(0,0,0,.7), inset 0 0 80px rgba(0,0,0,.35);
+  background:radial-gradient(ellipse 70% 55% at 50% 40%, #175030 0%, #0c3320 100%);
+  border:2px solid rgba(255,255,255,.06);
+  box-shadow:0 8px 40px rgba(0,0,0,.55),inset 0 0 50px rgba(0,0,0,.2);
   overflow:visible;
 }
+.log-panel{width:200px;flex-shrink:0;padding-top:52px}
+.log-label{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
 .seats{position:absolute;inset:0;pointer-events:none}
 .seat{
   position:absolute;transform:translate(-50%,-50%);pointer-events:all;
@@ -146,12 +149,8 @@ nav button:hover{color:var(--ink)}
 .board{display:flex;gap:7px;align-items:center}
 .board .slot{width:50px;height:68px;border-radius:5px;border:1px dashed rgba(255,255,255,.15)}
 
-.log{
-  margin:10px 0 0;padding:8px 2px 4px;
-  font-size:11px;color:var(--dim);height:68px;overflow-y:auto;
-  border-top:1px solid var(--line);
-}
-.log div{padding:1px 0}
+.log{font-size:11px;color:var(--dim);line-height:1.65}
+.log div{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03)}
 .log .hl{color:var(--muted)}
 
 .me{
@@ -325,8 +324,10 @@ nav button:hover{color:var(--ink)}
 }
 .setup-start:hover{opacity:.88}
 
-@media (max-width:680px){
-  .table-area{padding:44px 68px}
+@media (max-width:760px){
+  .game-layout{flex-direction:column;gap:0}
+  .log-panel{width:100%;padding-top:12px}
+  .table-area{padding:40px 60px;width:100%}
   .seat{width:104px;padding:6px 7px}
   .seat .nm b{font-size:12px}
   .card{width:28px;height:38px;font-size:11px}
@@ -372,16 +373,21 @@ nav button:hover{color:var(--ink)}
       <button class="ghost" onclick="endSession()">End session</button>
     </div>
 
-    <div class="table-area">
-      <div class="table">
-        <div class="seats" id="seats"></div>
-        <div class="center">
-          <div class="pot" id="potline"></div>
-          <div class="board" id="board"></div>
+    <div class="game-layout">
+      <div class="table-area">
+        <div class="table">
+          <div class="seats" id="seats"></div>
+          <div class="center">
+            <div class="pot" id="potline"></div>
+            <div class="board" id="board"></div>
+          </div>
         </div>
       </div>
+      <div class="log-panel">
+        <div class="log-label">Hand log</div>
+        <div class="log" id="log"></div>
+      </div>
     </div>
-    <div class="log" id="log"></div>
 
     <div class="me" id="mepanel">
       <div class="merow">
@@ -2382,8 +2388,7 @@ function renderCenter(){
 }
 function renderLog(){
   const el = document.getElementById('log');
-  el.innerHTML = S.logLines.slice(-12).map(l=>`<div class="${l.hl?'hl':''}">${l.line}</div>`).join('');
-  el.scrollTop = el.scrollHeight;
+  el.innerHTML = S.logLines.slice(-30).map(l=>`<div class="${l.hl?'hl':''}">${l.line}</div>`).join('');
 }
 function renderMe(){
   const me = S.players[0];
