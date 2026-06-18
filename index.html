@@ -98,7 +98,7 @@ nav button:hover{color:var(--ink)}
 }
 .log-panel{width:200px;flex-shrink:0;padding-top:52px}
 .log-label{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
-.seats{position:absolute;inset:0;pointer-events:none}
+.seats{position:absolute;inset:0;pointer-events:none;z-index:2}
 .seat{
   position:absolute;transform:translate(-50%,-50%);pointer-events:all;
   width:132px;
@@ -389,6 +389,9 @@ nav button:hover{color:var(--ink)}
       </div>
     </div>
 
+    <div class="coach" id="coachpanel" style="display:none"></div>
+    <div class="hint-panel" id="hintpanel" style="display:none"></div>
+
     <div class="me" id="mepanel">
       <div class="merow">
         <button class="posbtn" id="mepos" onclick="positionGuide()">·</button>
@@ -400,9 +403,6 @@ nav button:hover{color:var(--ink)}
       <div class="poshint" id="poshint"></div>
       <div class="actions" id="actbar"></div>
     </div>
-
-    <div class="coach" id="coachpanel" style="display:none"></div>
-    <div class="hint-panel" id="hintpanel" style="display:none"></div>
   </section>
 
   <!-- ============ STATS ============ -->
