@@ -791,14 +791,25 @@ export function cardHTML(c,cls){
   const red=(c.s==='h'||c.s==='d')?' red':'';
   return `<span class="card${red} ${cls||''}">${RANKCH[c.r]}${SUITCH[c.s]}</span>`;
 }
+/* Fixed seat positions [x%, y%] for each AI opponent count (1-8).
+   Designed for the 18:10 table aspect ratio with the player at the bottom. */
+const SEAT_GRID = [
+  null,
+  [[50,10]],
+  [[27,18],[73,18]],
+  [[50,10],[80,55],[20,55]],
+  [[50,10],[82,30],[82,67],[18,30]],
+  [[50,8],[82,22],[82,62],[18,62],[18,22]],
+  [[50,8],[78,14],[88,50],[75,82],[25,82],[12,50],[22,14]],
+  [[50,8],[74,9],[89,38],[88,70],[62,87],[38,87],[11,70],[26,9]],
+  [[50,7],[70,7],[88,30],[90,60],[70,84],[30,84],[10,60],[12,30],[30,7]],
+];
 export function renderSeats(){
   const players=S.players.slice(1), n=players.length;
-  const halfArc=Math.min(60+Math.max(0,n-2)*20,140);
-  const startDeg=270-halfArc, rx=38, ry=37;
+  const positions=SEAT_GRID[Math.min(n,8)]||SEAT_GRID[8];
   const html=players.map((p,i)=>{
-    const deg=n===1?270:startDeg+(i/(n-1))*halfArc*2;
-    const rad=deg*Math.PI/180;
-    const x=(50+rx*Math.cos(rad)).toFixed(1), y=(50+ry*Math.sin(rad)).toFixed(1);
+    const pos=positions[Math.min(i,positions.length-1)];
+    const x=pos[0].toFixed(1), y=pos[1].toFixed(1);
     const acting=S.acting===p.id?' acting':'';
     const folded=p.folded&&!p.out?' folded':'';
     const out=(p.out&&!p.revealed)?' out':'';
