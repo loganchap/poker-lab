@@ -1,0 +1,247 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poker Lab · NLHE Trainer</title>
+<meta name="description" content="Free in-browser poker trainer. Play against 5 AI types, get hand-by-hand coaching, and track your stats. No account needed.">
+<meta property="og:title" content="Poker Lab · NLHE Trainer">
+<meta property="og:description" content="Built this to teach myself poker. Play no-limit hold'em against AI opponents with up to 9 players, get coaching on every hand, track your win rate. Free, no account, runs in your browser.">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='16' fill='%231a1a2e'/%3E%3Ctext x='50' y='90' dy='-5' text-anchor='middle' font-size='120' fill='%23e2b94b'%3E%E2%99%A0%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="hrow">
+      <div class="brand">Poker<span class="dot">·</span>Lab</div>
+      <nav>
+        <button id="tab-table" class="on" onclick="showView('table')">Table</button>
+        <button id="tab-stats" onclick="showView('stats')">Stats</button>
+        <button id="tab-history" onclick="showView('history')">History</button>
+      </nav>
+    </div>
+    <div class="ticker" id="ticker"></div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ TABLE ============ -->
+  <section id="view-table">
+    <div class="modebar">
+      <div class="seg">
+        <button id="mode-cash" class="on" onclick="setMode('cash')">Cash</button>
+        <button id="mode-tourney" onclick="setMode('tourney')">Tournament</button>
+      </div>
+      <div class="modeinfo" id="modeinfo"></div>
+      <div class="spacer"></div>
+      <button class="ghost" id="eqToggle" onclick="toggleEquity()">Win %: off</button>
+      <button class="ghost" id="rebuyBtn" style="display:none" onclick="rebuy()">Rebuy</button>
+      <button class="ghost" onclick="openSetup()">New game</button>
+      <button class="ghost" onclick="endSession()">End session</button>
+    </div>
+
+    <div class="game-layout">
+      <div class="table-area">
+        <div class="table">
+          <div class="seats" id="seats"></div>
+          <div class="center">
+            <div class="pot" id="potline"></div>
+            <div class="board" id="board"></div>
+          </div>
+        </div>
+      </div>
+      <div class="log-panel">
+        <div class="log-label">Hand log</div>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+
+    <div class="coach" id="coachpanel" style="display:none"></div>
+    <div class="hint-panel" id="hintpanel" style="display:none"></div>
+
+    <div class="me" id="mepanel">
+      <div class="merow">
+        <button class="posbtn" id="mepos" onclick="positionGuide()">·</button>
+        <span class="cards" id="mecards"></span>
+        <span class="mestk" id="mestk"></span>
+        <span class="tocall" id="metocall"></span>
+        <span class="eqbadge" id="eqbadge" style="display:none"></span>
+      </div>
+      <div class="poshint" id="poshint"></div>
+      <div class="actions" id="actbar"></div>
+    </div>
+  </section>
+
+  <!-- ============ STATS ============ -->
+  <section id="view-stats" style="display:none">
+    <div class="statshead">
+      <div class="seg">
+        <button id="scope-life" class="on" onclick="setScope('life')">Lifetime</button>
+        <button id="scope-sess" onclick="setScope('sess')">Session</button>
+      </div>
+      <div class="modeinfo" id="statsub"></div>
+    </div>
+    <div class="statgrid" id="statgrid"></div>
+    <div class="leaks" id="leakpanel"></div>
+    <div class="settingsrow">
+      <span>Stats are measured in big blinds so cash and tournament hands compare cleanly. Table amounts are chips.</span>
+      <span style="flex:1"></span>
+      <button class="ghost" onclick="exportData()" title="Download your stats and hand history as a backup file">Export data</button>
+      <button class="ghost" onclick="importData()" title="Load a previously exported backup file">Import data</button>
+      <button class="ghost danger" onclick="resetAll()">Reset all data</button>
+    </div>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section id="view-history" style="display:none">
+    <div class="filters">
+      <select id="f-pos" onchange="renderHistory()">
+        <option value="">Position: all</option>
+        <option>BTN</option><option>SB</option><option>BB</option>
+        <option>UTG</option><option>HJ</option><option>CO</option>
+      </select>
+      <select id="f-flag" onchange="renderHistory()">
+        <option value="">Filter: all</option>
+        <option value="won">Won</option>
+        <option value="lost">Lost</option>
+        <option value="vpip">Played (VPIP)</option>
+        <option value="pfr">Raised preflop</option>
+        <option value="threeBet">3-bet</option>
+        <option value="foldCbet">Folded to c-bet</option>
+        <option value="wtsd">Went to showdown</option>
+        <option value="noted">Has coach note</option>
+      </select>
+      <select id="f-mode" onchange="renderHistory()">
+        <option value="">Mode: all</option>
+        <option value="cash">Cash</option>
+        <option value="tourney">Tournament</option>
+      </select>
+      <span style="flex:1"></span>
+      <button class="ghost danger" onclick="clearHistory()">Clear history</button>
+    </div>
+    <div id="histlist"></div>
+  </section>
+
+</main>
+
+<div class="overlay" id="overlay" style="display:none">
+  <div class="modal" id="modalbox"></div>
+</div>
+
+<!-- ============ SETUP SCREEN ============ -->
+<div class="setup-overlay" id="setupOverlay">
+  <div class="setup-box">
+    <h2>Poker<span style="color:var(--felt)">·</span>Lab</h2>
+    <div class="sub">Configure your game before you sit down</div>
+
+    <div class="setup-section">Game type</div>
+    <div class="setup-grid">
+      <div class="setup-group">
+        <label>Mode</label>
+        <select id="cfg-mode" onchange="updateSetupUI()">
+          <option value="cash">Cash game</option>
+          <option value="tourney">Tournament (Sit &amp; Go)</option>
+        </select>
+      </div>
+      <div class="setup-group">
+        <label>Players at table</label>
+        <select id="cfg-players">
+          <option value="2">2-handed (heads up)</option>
+          <option value="3">3-handed</option>
+          <option value="4">4-handed</option>
+          <option value="5">5-handed</option>
+          <option value="6" selected>6-max (default)</option>
+          <option value="7">7-handed</option>
+          <option value="8">8-handed</option>
+          <option value="9">9-handed (full ring)</option>
+        </select>
+        <span class="hint">Adds or removes AI opponents</span>
+      </div>
+    </div>
+
+    <div class="setup-section">Blinds &amp; stacks</div>
+    <div class="setup-grid">
+      <div class="setup-group">
+        <label>Starting stack (chips)</label>
+        <input type="number" id="cfg-stack" min="100" max="100000" step="100" value="300">
+      </div>
+      <div class="setup-group">
+        <label>Small blind</label>
+        <input type="number" id="cfg-sb" min="1" max="10000" step="1" value="1">
+      </div>
+      <div class="setup-group">
+        <label>Big blind</label>
+        <input type="number" id="cfg-bb" min="2" max="20000" step="1" value="3">
+      </div>
+
+    </div>
+
+    <div id="cfg-tourney-section">
+      <div class="setup-section">Blind schedule (tournament)</div>
+      <div class="hint" style="margin-bottom:10px;color:var(--dim);font-size:11px">Pick a preset or the blinds will start at your SB/BB and escalate on the schedule below.</div>
+      <div class="setup-blinds">
+        <div class="blind-chip on" id="sched-bar" onclick="pickSched('bar')">
+          <b>Bar game</b>100/200 start
+        </div>
+        <div class="blind-chip" id="sched-casino" onclick="pickSched('casino')">
+          <b>Casino SNG</b>25/50 start
+        </div>
+        <div class="blind-chip" id="sched-turbo" onclick="pickSched('turbo')">
+          <b>Turbo</b>Fast escalation
+        </div>
+        <div class="blind-chip" id="sched-custom" onclick="pickSched('custom')">
+          <b>Custom</b>Use my SB/BB above
+        </div>
+      </div>
+      <div class="setup-grid">
+        <div class="setup-group">
+          <label>Hands per blind level</label>
+          <select id="cfg-handsPerLevel">
+            <option value="6">6 hands (fast)</option>
+            <option value="8" selected>8 hands (standard)</option>
+            <option value="10">10 hands (slow)</option>
+            <option value="15">15 hands (very slow)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-section">Opponents</div>
+    <div class="setup-grid setup-full" style="grid-column:1/-1;margin-bottom:10px">
+      <div class="setup-group setup-full">
+        <label>Opponent style</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+          <div class="blind-chip on" id="opp-custom" onclick="setOppMode('custom')" style="flex:1;min-width:120px"><b>Custom</b>Pick each seat</div>
+          <div class="blind-chip" id="opp-random" onclick="setOppMode('random')" style="flex:1;min-width:120px"><b>Random</b>Shuffled every game</div>
+          <div class="blind-chip" id="opp-mixed" onclick="setOppMode('mixed')" style="flex:1;min-width:120px"><b>Mixed</b>One of each type</div>
+        </div>
+      </div>
+    </div>
+    <div id="cfg-ai-slots" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:12px"></div>
+    <div id="opp-random-note" style="display:none;font-size:11px;color:var(--dim);margin-bottom:14px">Opponent types will be randomly assigned at the start of each game. Good for unpredictable practice.</div>
+
+    <div class="setup-section">AI hint assistant</div>
+    <div class="setup-grid" style="margin-bottom:18px">
+      <div class="setup-group setup-full">
+        <label>Live coaching during hands</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+          <div class="blind-chip" id="hint-off" onclick="setHintMode('off')" style="flex:1"><b>Off</b>Review after hand only</div>
+          <div class="blind-chip on" id="hint-question" onclick="setHintMode('question')" style="flex:1"><b>Ask me</b>Coach asks a question on key decisions</div>
+        </div>
+        <span class="hint" style="margin-top:6px">When enabled, the coach will ask you a question at key moments (big calls, missed bets) so you think through the decision before acting.</span>
+      </div>
+    </div>
+
+    <button class="setup-start" onclick="startFromSetup()">Deal first hand</button>
+  </div>
+</div>
+
+<script type="module" src="js/game.js"></script>
+</body>
+</html>
