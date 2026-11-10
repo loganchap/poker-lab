@@ -132,7 +132,7 @@ nav button:hover{color:var(--ink)}
 }
 .pot{font-size:11px;color:rgba(255,255,255,.5);letter-spacing:.1em;text-transform:uppercase;text-align:center}
 .pot b{color:#fff;font-weight:600;font-size:17px;display:block;margin-top:3px}
-.board{display:flex;gap:7px;align-items:center}
+.board{display:flex;gap:4px;align-items:center}
 .board .slot{width:50px;height:68px;border-radius:5px;border:1px dashed rgba(255,255,255,.15)}
 
 .log{font-size:11px;color:var(--dim);line-height:1.65}
